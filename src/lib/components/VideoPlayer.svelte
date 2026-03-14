@@ -1,6 +1,6 @@
 <script lang="ts">
   import CanvasOverlay from "./CanvasOverlay.svelte";
-  import type { Target, Phase, AnnotationRow } from "../types";
+  import type { Target, Phase, AnnotationRow, ShapeSizes } from "../types";
   import { annotations } from "../stores/annotations";
 
   interface Props {
@@ -13,6 +13,7 @@
     duration: number;
     currentFrame: number;
     annotations: AnnotationRow[];
+    shapeSizes: ShapeSizes;
     onPhaseComplete: () => void;
     onVideoError: (msg: string) => void;
   }
@@ -27,6 +28,7 @@
     duration = $bindable(),
     currentFrame = $bindable(),
     annotations: annotationRows,
+    shapeSizes,
     onPhaseComplete,
     onVideoError,
   }: Props = $props();
@@ -207,6 +209,7 @@
         {currentFrame}
         {currentTime}
         annotations={annotationRows}
+        {shapeSizes}
       />
     {/if}
   {:else}

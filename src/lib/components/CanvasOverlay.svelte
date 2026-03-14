@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import type { Target, Phase, AnnotationRow } from "../types";
-  import { SHAPE_SIZES, TARGET_COLORS, INACTIVE_COLOR } from "../types";
+  import type { Target, Phase, AnnotationRow, ShapeSizes } from "../types";
+  import { TARGET_COLORS, INACTIVE_COLOR } from "../types";
   import { annotations } from "../stores/annotations";
   import { angleDeg, dist } from "../utils/geometry";
 
@@ -17,6 +17,7 @@
     currentFrame: number;
     currentTime: number;
     annotations: AnnotationRow[];
+    shapeSizes: ShapeSizes;
   }
 
   let {
@@ -31,6 +32,7 @@
     currentFrame,
     currentTime,
     annotations: annotationRows,
+    shapeSizes,
   }: Props = $props();
 
   let canvasEl = $state<HTMLCanvasElement | null>(null);
@@ -136,8 +138,9 @@
     const _dragYaw = dragYaw;
     const _target = target;
     const _phase = phase;
-    // Read annotationRows reactively for drawing the other target
+    // Read annotationRows and shapeSizes reactively
     const _rows = annotationRows;
+    const _shapeSizes = shapeSizes;
 
     const ctx = canvasEl.getContext("2d")!;
     ctx.clearRect(0, 0, _width, _height);
@@ -164,7 +167,7 @@
     if (!pos) return;
 
     const pixel = toPixel(pos.x, pos.y);
-    const sizes = SHAPE_SIZES[t];
+    const sizes = shapeSizes[t];
     const color = active ? TARGET_COLORS[t] : INACTIVE_COLOR;
     const isOrientationPhase = active && activePhase === "orientation";
 
@@ -255,7 +258,7 @@
     if (e.button !== 0) return;
     const coords = getCanvasCoords(e);
     const pixel = toPixel(dragX, dragY);
-    const sizes = SHAPE_SIZES[target];
+    const sizes = shapeSizes[target];
 
     if (phase === "position") {
       const r = sizes.circleRadius;
