@@ -278,6 +278,7 @@
         {currentTime}
         annotations={annotationRows}
         {shapeSizes}
+        {detectedFps}
       />
     {/if}
   {:else}
