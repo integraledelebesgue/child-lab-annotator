@@ -14,6 +14,7 @@
     currentFrame: number;
     annotations: AnnotationRow[];
     onPhaseComplete: () => void;
+    onVideoError: (msg: string) => void;
   }
 
   let {
@@ -27,6 +28,7 @@
     currentFrame = $bindable(),
     annotations: annotationRows,
     onPhaseComplete,
+    onVideoError,
   }: Props = $props();
 
   let videoEl = $state<HTMLVideoElement | null>(null);
@@ -64,6 +66,12 @@
 
   function onLoadedMetadata() {
     if (!videoEl) return;
+    currentTime = 0;
+    currentFrame = 0;
+    isPlaying = false;
+    detectedFps = 30;
+    fpsProbeCount = 0;
+    lastMediaTime = -1;
     duration = videoEl.duration;
     videoWidth = videoEl.videoWidth;
     videoHeight = videoEl.videoHeight;
@@ -91,6 +99,15 @@
   function onTimeUpdate() {
     if (!videoEl) return;
     currentTime = videoEl.currentTime;
+  }
+
+  function onError() {
+    if (!videoEl) return;
+    const err = videoEl.error;
+    const msg = err
+      ? `Video error: ${err.message || "format not supported by this platform"}`
+      : "Failed to load video — format may not be supported";
+    onVideoError(msg);
   }
 
   function onPlay() {
@@ -172,6 +189,7 @@
       onplay={onPlay}
       onpause={onPause}
       onended={onEnded}
+      onerror={onError}
       preload="auto"
       style="width: {displayWidth}px; height: {displayHeight}px; margin-left: {offsetX}px; margin-top: {offsetY}px;"
     ></video>

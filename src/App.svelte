@@ -21,6 +21,9 @@
   let currentFrame = $state(0);
   let toast = $state<string | null>(null);
   let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+  let isConverting = $state(false);
+
+  const NATIVE_EXTENSIONS = new Set(["mp4", "m4v", "mov", "webm", "ogg", "ogv"]);
 
   function showToast(msg: string) {
     toast = msg;
@@ -28,14 +31,37 @@
     toastTimeout = setTimeout(() => (toast = null), 3000);
   }
 
+  function getExtension(path: string): string {
+    return path.split(".").pop()?.toLowerCase() ?? "";
+  }
+
   async function loadVideo() {
     const file = await open({
       multiple: false,
-      filters: [{ name: "Video", extensions: ["mp4", "webm", "ogg", "avi", "mkv", "mov"] }],
+      filters: [
+        { name: "Video", extensions: ["mp4", "m4v", "mov", "webm", "ogg", "ogv", "avi", "mkv", "wmv", "flv", "mpg", "mpeg", "ts", "3gp"] },
+        { name: "All files", extensions: ["*"] },
+      ],
     });
     if (!file) return;
     videoPath = file;
-    videoSrc = convertFileSrc(file);
+
+    const ext = getExtension(file);
+    if (NATIVE_EXTENSIONS.has(ext)) {
+      videoSrc = convertFileSrc(file);
+    } else {
+      isConverting = true;
+      showToast("Converting video to a compatible format...");
+      try {
+        const converted = await invoke<string>("convert_video", { path: file });
+        videoSrc = convertFileSrc(converted);
+      } catch (e: any) {
+        showToast(`${e}`);
+        videoSrc = null;
+      } finally {
+        isConverting = false;
+      }
+    }
   }
 
   async function loadCSV() {
@@ -135,7 +161,14 @@
       bind:currentFrame
       annotations={annotations_val}
       {onPhaseComplete}
+      onVideoError={showToast}
     />
+    {#if isConverting}
+      <div class="converting-overlay">
+        <div class="spinner"></div>
+        <p>Converting video...</p>
+      </div>
+    {/if}
   </div>
 
   <Controls
@@ -165,6 +198,32 @@
     min-height: 0;
     position: relative;
     background: #000;
+  }
+
+  .converting-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    color: var(--text);
+    gap: 16px;
+    z-index: 10;
+  }
+
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent-active);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 
   .toast {
