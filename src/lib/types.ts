@@ -27,6 +27,15 @@ export const DEFAULT_SHAPE_SIZES: ShapeSizes = {
   mother: { circleRadius: 35, ellipseA: 40, ellipseB: 31 },
 };
 
+export interface Fragment {
+  id: number;
+  startTime: number;
+  endTime: number;
+  thumbnail: string | null;
+  annotations: AnnotationRow[];
+  completedPhases: Set<PhaseKey>;
+}
+
 export const TARGET_COLORS: Record<Target, string> = {
   infant: "#3b82f6",
   mother: "#22c55e",

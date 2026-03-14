@@ -12,8 +12,11 @@
     currentTime: number;
     duration: number;
     currentFrame: number;
+    detectedFps: number;
     annotations: AnnotationRow[];
     shapeSizes: ShapeSizes;
+    fragmentStartTime: number | null;
+    fragmentEndTime: number | null;
     onPhaseComplete: () => void;
     onVideoError: (msg: string) => void;
   }
@@ -27,8 +30,11 @@
     currentTime = $bindable(),
     duration = $bindable(),
     currentFrame = $bindable(),
+    detectedFps = $bindable(),
     annotations: annotationRows,
     shapeSizes,
+    fragmentStartTime,
+    fragmentEndTime,
     onPhaseComplete,
     onVideoError,
   }: Props = $props();
@@ -42,9 +48,9 @@
   let offsetX = $state(0);
   let offsetY = $state(0);
   let frameCallbackId = $state<number | null>(null);
-  let detectedFps = $state(30);
   let fpsProbeCount = 0;
   let lastMediaTime = -1;
+  let fragmentEndTriggered = false;
 
   $effect(() => {
     if (videoEl) {
@@ -52,18 +58,27 @@
     }
   });
 
-  // Reset video to beginning when target or phase changes
+  // Reset video to beginning (or fragment start) when target or phase changes
   $effect(() => {
     // Subscribe to target and phase
     void target;
     void phase;
     if (!videoEl) return;
     videoEl.pause();
-    videoEl.currentTime = 0;
-    currentTime = 0;
-    currentFrame = 0;
+    const seekTo = fragmentStartTime ?? 0;
+    videoEl.currentTime = seekTo;
+    currentTime = seekTo;
+    currentFrame = Math.round(seekTo * detectedFps);
     isPlaying = false;
     lastMediaTime = -1;
+    fragmentEndTriggered = false;
+  });
+
+  // Reset fragmentEndTriggered when fragment changes
+  $effect(() => {
+    void fragmentStartTime;
+    void fragmentEndTime;
+    fragmentEndTriggered = false;
   });
 
   function onLoadedMetadata() {
@@ -74,6 +89,7 @@
     detectedFps = 30;
     fpsProbeCount = 0;
     lastMediaTime = -1;
+    fragmentEndTriggered = false;
     duration = videoEl.duration;
     videoWidth = videoEl.videoWidth;
     videoHeight = videoEl.videoHeight;
@@ -101,6 +117,14 @@
   function onTimeUpdate() {
     if (!videoEl) return;
     currentTime = videoEl.currentTime;
+
+    // Fragment boundary enforcement
+    if (fragmentEndTime !== null && currentTime >= fragmentEndTime && !fragmentEndTriggered) {
+      fragmentEndTriggered = true;
+      videoEl.pause();
+      isPlaying = false;
+      onPhaseComplete();
+    }
   }
 
   function onError() {
@@ -114,6 +138,7 @@
 
   function onPlay() {
     isPlaying = true;
+    fragmentEndTriggered = false;
     startFrameCallback();
   }
 
@@ -123,7 +148,9 @@
 
   function onEnded() {
     isPlaying = false;
-    onPhaseComplete();
+    if (!fragmentEndTriggered) {
+      onPhaseComplete();
+    }
   }
 
   function startFrameCallback() {
@@ -131,6 +158,17 @@
     if ("requestVideoFrameCallback" in videoEl) {
       const cb = (now: number, metadata: { mediaTime: number }) => {
         if (!videoEl) return;
+
+        // Fragment boundary check (frame-level precision)
+        if (fragmentEndTime !== null && metadata.mediaTime >= fragmentEndTime) {
+          if (!fragmentEndTriggered) {
+            fragmentEndTriggered = true;
+            videoEl.pause();
+            isPlaying = false;
+            onPhaseComplete();
+          }
+          return;
+        }
 
         // Detect FPS from first few frame intervals
         if (lastMediaTime >= 0 && fpsProbeCount < 10) {
@@ -158,6 +196,14 @@
   export function togglePlay() {
     if (!videoEl) return;
     if (videoEl.paused) {
+      // If at fragment end, seek back to start before playing
+      if (fragmentEndTime !== null && currentTime >= fragmentEndTime) {
+        const seekTo = fragmentStartTime ?? 0;
+        videoEl.currentTime = seekTo;
+        currentTime = seekTo;
+        currentFrame = Math.round(seekTo * detectedFps);
+        fragmentEndTriggered = false;
+      }
       videoEl.play();
     } else {
       videoEl.pause();
@@ -168,6 +214,28 @@
     if (!videoEl) return;
     videoEl.currentTime = time;
     currentTime = time;
+    fragmentEndTriggered = false;
+  }
+
+  export async function captureThumbnail(time: number): Promise<string> {
+    if (!videoEl) return "";
+    return new Promise((resolve) => {
+      const onSeeked = () => {
+        videoEl!.removeEventListener("seeked", onSeeked);
+        const canvas = document.createElement("canvas");
+        const thumbWidth = 240;
+        const thumbHeight = Math.round(
+          thumbWidth * (videoEl!.videoHeight / videoEl!.videoWidth)
+        );
+        canvas.width = thumbWidth;
+        canvas.height = thumbHeight;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(videoEl!, 0, 0, thumbWidth, thumbHeight);
+        resolve(canvas.toDataURL("image/jpeg", 0.6));
+      };
+      videoEl!.addEventListener("seeked", onSeeked);
+      videoEl!.currentTime = time;
+    });
   }
 
   let resizeObserver: ResizeObserver | null = null;

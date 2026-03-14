@@ -6,11 +6,16 @@
         phase: Phase;
         completed: Set<PhaseKey>;
         shapeSizes: ShapeSizes;
+        hasVideo: boolean;
+        hasFragments: boolean;
+        fragmentLength: number;
         onTargetChange: (t: Target) => void;
         onPhaseChange: (p: Phase) => void;
         onLoadVideo: () => void;
         onLoadCSV: () => void;
         onExportCSV: () => void;
+        onFragment: () => void;
+        onClearFragments: () => void;
     }
 
     let {
@@ -18,11 +23,16 @@
         phase,
         completed,
         shapeSizes = $bindable(),
+        hasVideo,
+        hasFragments,
+        fragmentLength = $bindable(),
         onTargetChange,
         onPhaseChange,
         onLoadVideo,
         onLoadCSV,
         onExportCSV,
+        onFragment,
+        onClearFragments,
     }: Props = $props();
 
     function isPhaseComplete(t: Target, p: Phase): boolean {
@@ -34,6 +44,26 @@
     <div class="toolbar-group">
         <button onclick={onLoadVideo}>Load Video</button>
         <button onclick={onLoadCSV}>Load CSV</button>
+    </div>
+
+    <div class="toolbar-group">
+        {#if !hasFragments}
+            <label class="size-control">
+                <span class="size-label">Len</span>
+                <input
+                    type="range"
+                    class="size-slider"
+                    min="5"
+                    max="60"
+                    step="5"
+                    bind:value={fragmentLength}
+                />
+                <span class="size-value">{fragmentLength}s</span>
+            </label>
+            <button onclick={onFragment} disabled={!hasVideo}>Fragment</button>
+        {:else}
+            <button onclick={onClearFragments}>Clear Fragments</button>
+        {/if}
     </div>
 
     <div class="toolbar-group">

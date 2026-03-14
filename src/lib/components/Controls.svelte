@@ -4,11 +4,17 @@
     playbackSpeed: number;
     currentTime: number;
     duration: number;
+    fragmentStartTime: number | null;
+    fragmentEndTime: number | null;
     onSeek: (time: number) => void;
     onTogglePlay: () => void;
   }
 
-  let { isPlaying = $bindable(), playbackSpeed = $bindable(), currentTime, duration, onSeek, onTogglePlay }: Props = $props();
+  let { isPlaying = $bindable(), playbackSpeed = $bindable(), currentTime, duration, fragmentStartTime, fragmentEndTime, onSeek, onTogglePlay }: Props = $props();
+
+  let seekMin = $derived(fragmentStartTime ?? 0);
+  let seekMax = $derived(fragmentEndTime ?? (duration || 1));
+  let displayDuration = $derived(fragmentEndTime ?? duration);
 
   function formatTime(seconds: number): string {
     const m = Math.floor(seconds / 60);
@@ -35,14 +41,14 @@
     <input
       type="range"
       class="seek-bar"
-      min="0"
-      max={duration || 1}
+      min={seekMin}
+      max={seekMax}
       step="0.01"
       value={currentTime}
       oninput={(e) => onSeek(parseFloat(e.currentTarget.value))}
     />
 
-    <span class="time">{formatTime(currentTime)} / {formatTime(duration)}</span>
+    <span class="time">{formatTime(currentTime)} / {formatTime(displayDuration)}</span>
   </div>
 
   <div class="controls-row secondary">
