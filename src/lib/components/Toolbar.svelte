@@ -1,146 +1,253 @@
 <script lang="ts">
-  import type { Target, Phase, PhaseKey } from "../types";
+    import type { Target, Phase, PhaseKey, ShapeSizes } from "../types";
 
-  interface Props {
-    target: Target;
-    phase: Phase;
-    completed: Set<PhaseKey>;
-    onTargetChange: (t: Target) => void;
-    onPhaseChange: (p: Phase) => void;
-    onLoadVideo: () => void;
-    onLoadCSV: () => void;
-    onExportCSV: () => void;
-  }
+    interface Props {
+        target: Target;
+        phase: Phase;
+        completed: Set<PhaseKey>;
+        shapeSizes: ShapeSizes;
+        onTargetChange: (t: Target) => void;
+        onPhaseChange: (p: Phase) => void;
+        onLoadVideo: () => void;
+        onLoadCSV: () => void;
+        onExportCSV: () => void;
+    }
 
-  let { target, phase, completed, onTargetChange, onPhaseChange, onLoadVideo, onLoadCSV, onExportCSV }: Props = $props();
+    let {
+        target,
+        phase,
+        completed,
+        shapeSizes = $bindable(),
+        onTargetChange,
+        onPhaseChange,
+        onLoadVideo,
+        onLoadCSV,
+        onExportCSV,
+    }: Props = $props();
 
-  function isPhaseComplete(t: Target, p: Phase): boolean {
-    return completed.has(`${t}-${p}` as PhaseKey);
-  }
+    function isPhaseComplete(t: Target, p: Phase): boolean {
+        return completed.has(`${t}-${p}` as PhaseKey);
+    }
 </script>
 
 <div class="toolbar">
-  <div class="toolbar-group">
-    <button onclick={onLoadVideo}>Load Video</button>
-    <button onclick={onLoadCSV}>Load CSV</button>
-  </div>
+    <div class="toolbar-group">
+        <button onclick={onLoadVideo}>Load Video</button>
+        <button onclick={onLoadCSV}>Load CSV</button>
+    </div>
 
-  <div class="toolbar-group">
-    <span class="label">Target:</span>
-    <label class="radio" class:active={target === "infant"}>
-      <input type="radio" name="target" value="infant" checked={target === "infant"} onchange={() => onTargetChange("infant")} />
-      <span class="dot infant"></span>
-      Infant
-    </label>
-    <label class="radio" class:active={target === "mother"}>
-      <input type="radio" name="target" value="mother" checked={target === "mother"} onchange={() => onTargetChange("mother")} />
-      <span class="dot mother"></span>
-      Mother
-    </label>
-  </div>
+    <div class="toolbar-group">
+        <span class="label">Target:</span>
+        <label class="radio" class:active={target === "infant"}>
+            <input
+                type="radio"
+                name="target"
+                value="infant"
+                checked={target === "infant"}
+                onchange={() => onTargetChange("infant")}
+            />
+            <span class="dot infant"></span>
+            Infant
+        </label>
+        <label class="radio" class:active={target === "mother"}>
+            <input
+                type="radio"
+                name="target"
+                value="mother"
+                checked={target === "mother"}
+                onchange={() => onTargetChange("mother")}
+            />
+            <span class="dot mother"></span>
+            Mother
+        </label>
+    </div>
 
-  <div class="toolbar-group">
-    <span class="label">Phase:</span>
-    <label class="radio" class:active={phase === "position"}>
-      <input type="radio" name="phase" value="position" checked={phase === "position"} onchange={() => onPhaseChange("position")} />
-      Position
-    </label>
-    <label class="radio" class:active={phase === "orientation"}>
-      <input type="radio" name="phase" value="orientation" checked={phase === "orientation"} onchange={() => onPhaseChange("orientation")} />
-      Orientation
-    </label>
-  </div>
+    <div class="toolbar-group">
+        <span class="label">Phase:</span>
+        <label class="radio" class:active={phase === "position"}>
+            <input
+                type="radio"
+                name="phase"
+                value="position"
+                checked={phase === "position"}
+                onchange={() => onPhaseChange("position")}
+            />
+            Position
+        </label>
+        <label class="radio" class:active={phase === "orientation"}>
+            <input
+                type="radio"
+                name="phase"
+                value="orientation"
+                checked={phase === "orientation"}
+                onchange={() => onPhaseChange("orientation")}
+            />
+            Orientation
+        </label>
+    </div>
 
-  <div class="toolbar-group">
-    <button onclick={onExportCSV}>Export CSV</button>
-  </div>
+    <div class="toolbar-group">
+        <button onclick={onExportCSV}>Export CSV</button>
+    </div>
 
-  <div class="toolbar-group status">
-    {#each ["infant", "mother"] as t}
-      {#each ["position", "orientation"] as p}
-        <span class="phase-status" class:done={isPhaseComplete(t as Target, p as Phase)}>
-          {isPhaseComplete(t as Target, p as Phase) ? "✓" : "○"}
-          {t} {p}
-        </span>
-      {/each}
-    {/each}
-  </div>
+    <div class="toolbar-group sizes">
+        <span class="label">Size:</span>
+        <label class="size-control">
+            <span class="size-label">R</span>
+            <input
+                type="range"
+                class="size-slider"
+                min="10"
+                max="120"
+                step="1"
+                bind:value={shapeSizes[target].circleRadius}
+            />
+            <span class="size-value">{shapeSizes[target].circleRadius}</span>
+        </label>
+        <label class="size-control">
+            <span class="size-label">A</span>
+            <input
+                type="range"
+                class="size-slider"
+                min="10"
+                max="120"
+                step="1"
+                bind:value={shapeSizes[target].ellipseA}
+            />
+            <span class="size-value">{shapeSizes[target].ellipseA}</span>
+        </label>
+        <label class="size-control">
+            <span class="size-label">B</span>
+            <input
+                type="range"
+                class="size-slider"
+                min="10"
+                max="120"
+                step="1"
+                bind:value={shapeSizes[target].ellipseB}
+            />
+            <span class="size-value">{shapeSizes[target].ellipseB}</span>
+        </label>
+    </div>
+
+    <div class="toolbar-group status">
+        {#each ["infant", "mother"] as t}
+            {#each ["position", "orientation"] as p}
+                <span
+                    class="phase-status"
+                    class:done={isPhaseComplete(t as Target, p as Phase)}
+                >
+                    {isPhaseComplete(t as Target, p as Phase) ? "✓" : "○"}
+                    {t}
+                    {p}
+                </span>
+            {/each}
+        {/each}
+    </div>
 </div>
 
 <style>
-  .toolbar {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 8px 16px;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border);
-    flex-wrap: wrap;
-  }
+    .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 8px 16px;
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+    }
 
-  .toolbar-group {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+    .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
 
-  .label {
-    color: var(--text-muted);
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
+    .label {
+        color: var(--text-muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
 
-  .radio {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-    border: 1px solid transparent;
-    transition: all 0.15s;
-  }
+    .radio {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        border: 1px solid transparent;
+        transition: all 0.15s;
+    }
 
-  .radio:hover {
-    background: var(--bg-surface);
-  }
+    .radio:hover {
+        background: var(--bg-surface);
+    }
 
-  .radio.active {
-    background: var(--bg-surface);
-    border-color: var(--border);
-  }
+    .radio.active {
+        background: var(--bg-surface);
+        border-color: var(--border);
+    }
 
-  .radio input {
-    display: none;
-  }
+    .radio input {
+        display: none;
+    }
 
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-  }
+    .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
 
-  .dot.infant {
-    background: var(--accent-infant);
-  }
+    .dot.infant {
+        background: var(--accent-infant);
+    }
 
-  .dot.mother {
-    background: var(--accent-mother);
-  }
+    .dot.mother {
+        background: var(--accent-mother);
+    }
 
-  .status {
-    margin-left: auto;
-    gap: 12px;
-  }
+    .sizes {
+        gap: 6px;
+    }
 
-  .phase-status {
-    font-size: 11px;
-    color: var(--text-muted);
-  }
+    .size-control {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
 
-  .phase-status.done {
-    color: var(--accent-mother);
-  }
+    .size-label {
+        color: var(--text-muted);
+        font-size: 11px;
+        min-width: 10px;
+    }
+
+    .size-slider {
+        width: 80px;
+        accent-color: var(--accent-active);
+    }
+
+    .size-value {
+        color: var(--accent-active);
+        font-size: 11px;
+        min-width: 18px;
+        text-align: right;
+    }
+
+    .status {
+        margin-left: auto;
+        gap: 12px;
+    }
+
+    .phase-status {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+
+    .phase-status.done {
+        color: var(--accent-mother);
+    }
 </style>

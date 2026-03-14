@@ -3,7 +3,8 @@
   import Toolbar from "./lib/components/Toolbar.svelte";
   import VideoPlayer from "./lib/components/VideoPlayer.svelte";
   import Controls from "./lib/components/Controls.svelte";
-  import type { Target, Phase } from "./lib/types";
+  import type { Target, Phase, ShapeSizes } from "./lib/types";
+  import { DEFAULT_SHAPE_SIZES } from "./lib/types";
   import { annotations, completedPhases } from "./lib/stores/annotations";
   import { toCSV, fromCSV } from "./lib/utils/csv";
   import { open, save } from "@tauri-apps/plugin-dialog";
@@ -22,6 +23,7 @@
   let toast = $state<string | null>(null);
   let toastTimeout: ReturnType<typeof setTimeout> | null = null;
   let isConverting = $state(false);
+  let shapeSizes: ShapeSizes = $state(structuredClone(DEFAULT_SHAPE_SIZES));
 
   const NATIVE_EXTENSIONS = new Set(["mp4", "m4v", "mov", "webm", "ogg", "ogv"]);
 
@@ -141,6 +143,7 @@
     {target}
     {phase}
     completed={completedPhases_val}
+    bind:shapeSizes
     onTargetChange={(t) => (target = t)}
     onPhaseChange={(p) => (phase = p)}
     onLoadVideo={loadVideo}
@@ -160,6 +163,7 @@
       bind:duration
       bind:currentFrame
       annotations={annotations_val}
+      {shapeSizes}
       {onPhaseComplete}
       onVideoError={showToast}
     />
