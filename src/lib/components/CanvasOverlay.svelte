@@ -18,6 +18,7 @@
     currentTime: number;
     annotations: AnnotationRow[];
     shapeSizes: ShapeSizes;
+    detectedFps: number;
   }
 
   let {
@@ -33,6 +34,7 @@
     currentTime,
     annotations: annotationRows,
     shapeSizes,
+    detectedFps,
   }: Props = $props();
 
   let canvasEl = $state<HTMLCanvasElement | null>(null);
@@ -148,6 +150,12 @@
     const otherTarget: Target = _target === "infant" ? "mother" : "infant";
 
     drawTarget(ctx, otherTarget, false, _currentFrame, _rows, _target, _phase, _dragX, _dragY, _dragYaw);
+
+    // Draw position trace in orientation phase (behind the active ellipse)
+    if (_phase === "orientation") {
+      drawPositionTrace(ctx, _rows, _target, _currentFrame, detectedFps, TARGET_COLORS[_target]);
+    }
+
     drawTarget(ctx, _target, true, _currentFrame, _rows, _target, _phase, _dragX, _dragY, _dragYaw);
   });
 
@@ -246,6 +254,53 @@
           ctx.stroke();
         }
       }
+    }
+  }
+
+  /** Draw a trace of upcoming positions (1 second ahead) for the orientation phase. */
+  function drawPositionTrace(
+    ctx: CanvasRenderingContext2D,
+    rows: AnnotationRow[],
+    t: Target,
+    frame: number,
+    fps: number,
+    color: string,
+  ) {
+    const lookahead = Math.round(fps);
+    const points: { x: number; y: number }[] = [];
+
+    for (let f = frame + 1; f <= frame + lookahead && f < rows.length; f++) {
+      const row = rows[f];
+      if (!row) continue;
+      const x = t === "infant" ? row.infantX : row.motherX;
+      const y = t === "infant" ? row.infantY : row.motherY;
+      if (x !== null && y !== null) {
+        points.push(toPixel(x, y));
+      }
+    }
+
+    if (points.length === 0) return;
+
+    // Draw connecting line segments with fading opacity
+    for (let i = 0; i < points.length - 1; i++) {
+      const progress = i / points.length;
+      const alpha = 0.5 - progress * 0.4; // 0.5 → 0.1
+      ctx.beginPath();
+      ctx.moveTo(points[i].x, points[i].y);
+      ctx.lineTo(points[i + 1].x, points[i + 1].y);
+      ctx.strokeStyle = color + Math.round(alpha * 255).toString(16).padStart(2, "0");
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Draw dots at each point
+    for (let i = 0; i < points.length; i++) {
+      const progress = i / points.length;
+      const alpha = 0.5 - progress * 0.4;
+      ctx.beginPath();
+      ctx.arc(points[i].x, points[i].y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = color + Math.round(alpha * 255).toString(16).padStart(2, "0");
+      ctx.fill();
     }
   }
 
