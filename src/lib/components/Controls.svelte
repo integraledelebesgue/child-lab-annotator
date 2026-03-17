@@ -57,9 +57,9 @@
     <input
       type="range"
       class="speed-slider"
-      min="0.10"
+      min="0.05"
       max="2.00"
-      step="0.01"
+      step="0.05"
       bind:value={playbackSpeed}
     />
   </div>
