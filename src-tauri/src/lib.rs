@@ -1,4 +1,6 @@
+use std::collections::hash_map::DefaultHasher;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
 use ffmpeg_sidecar::command::FfmpegCommand;
@@ -27,10 +29,14 @@ fn convert_video(path: String) -> Result<String, String> {
     }
 
     let stem = input.file_stem().unwrap_or_default().to_string_lossy();
+    let mut hasher = DefaultHasher::new();
+    input.canonicalize().unwrap_or_else(|_| input.clone()).hash(&mut hasher);
+    let path_hash = format!("{:016x}", hasher.finish());
+
     let temp_dir = std::env::temp_dir().join("child-lab-annotator");
     fs::create_dir_all(&temp_dir).map_err(|e| format!("Failed to create temp dir: {}", e))?;
 
-    let output = temp_dir.join(format!("{}.mp4", stem));
+    let output = temp_dir.join(format!("{}_{}.mp4", stem, path_hash));
 
     // Skip conversion if already converted
     if output.exists() {
