@@ -7,7 +7,7 @@
   import type { Target, Phase, ShapeSizes, Fragment } from "./lib/types";
   import { DEFAULT_SHAPE_SIZES } from "./lib/types";
   import { annotations, completedPhases } from "./lib/stores/annotations";
-  import { toCSV, fromCSV } from "./lib/utils/csv";
+  import { toCSV, fromCSV, type CSVMetadata } from "./lib/utils/csv";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 
@@ -94,14 +94,19 @@
     if (!file) return;
     try {
       const text = await invoke<string>("read_text_file", { path: file });
-      const rows = fromCSV(text);
-      if (rows.length === 0) {
+      const result = fromCSV(text);
+      if (result.rows.length === 0) {
         showToast("CSV file is empty or invalid");
         return;
       }
-      annotations.set(rows);
-      completedPhases.setFromData(rows);
-      showToast(`Loaded ${rows.length} rows from CSV`);
+      annotations.set(result.rows);
+      completedPhases.setFromData(result.rows);
+      if (result.metadata) {
+        playbackSpeed = result.metadata.playbackSpeed;
+        shapeSizes = result.metadata.shapeSizes;
+        fragmentLength = result.metadata.fragmentLength;
+      }
+      showToast(`Loaded ${result.rows.length} rows from CSV`);
     } catch (e: any) {
       showToast(`Error loading CSV: ${e}`);
     }
@@ -128,7 +133,7 @@
     if (!file) return;
     try {
       const csvRows = filterAnnotationRows(rows);
-      await invoke("write_text_file", { path: file, contents: toCSV(csvRows) });
+      await invoke("write_text_file", { path: file, contents: toCSV(csvRows, csvMetadata) });
       showToast("CSV exported successfully");
     } catch (e: any) {
       showToast(`Export failed: ${e}`);
@@ -175,7 +180,7 @@
     }
     try {
       const csvRows = filterAnnotationRows(rows);
-      await invoke("write_text_file", { path, contents: toCSV(csvRows) });
+      await invoke("write_text_file", { path, contents: toCSV(csvRows, csvMetadata) });
       showToast(`Auto-saved to ${path.split(/[/\\]/).pop()}`);
     } catch (e: any) {
       showToast(`Auto-save failed: ${e}`);
@@ -192,7 +197,7 @@
     }
     try {
       const csvRows = filterAnnotationRows(frag.annotations);
-      await invoke("write_text_file", { path, contents: toCSV(csvRows) });
+      await invoke("write_text_file", { path, contents: toCSV(csvRows, csvMetadata) });
       showToast(`Auto-saved to ${path.split(/[/\\]/).pop()}`);
     } catch (e: any) {
       showToast(`Auto-save failed: ${e}`);
@@ -288,6 +293,12 @@
     annotations.clear();
     completedPhases.reset();
   }
+
+  let csvMetadata: CSVMetadata = $derived({
+    playbackSpeed,
+    shapeSizes,
+    fragmentLength,
+  });
 
   let annotations_val = $derived($annotations);
   let completedPhases_val = $derived($completedPhases);

@@ -1,4 +1,5 @@
-import type { AnnotationRow } from "../types";
+import type { AnnotationRow, ShapeSizes } from "../types";
+import { DEFAULT_SHAPE_SIZES } from "../types";
 
 const HEADER = "frame,timestamp,infant_x,infant_y,infant_yaw,mother_x,mother_y,mother_yaw";
 
@@ -7,8 +8,19 @@ function formatNum(v: number | null): string {
   return v.toFixed(4);
 }
 
-export function toCSV(rows: AnnotationRow[]): string {
-  const lines = [HEADER];
+export interface CSVMetadata {
+  playbackSpeed: number;
+  shapeSizes: ShapeSizes;
+  fragmentLength: number;
+}
+
+export function toCSV(rows: AnnotationRow[], metadata: CSVMetadata): string {
+  const lines = [
+    `# playback_speed=${metadata.playbackSpeed},fragment_length=${metadata.fragmentLength}`,
+    `# infant_circle_r=${metadata.shapeSizes.infant.circleRadius},infant_ellipse_a=${metadata.shapeSizes.infant.ellipseA},infant_ellipse_b=${metadata.shapeSizes.infant.ellipseB}`,
+    `# mother_circle_r=${metadata.shapeSizes.mother.circleRadius},mother_ellipse_a=${metadata.shapeSizes.mother.ellipseA},mother_ellipse_b=${metadata.shapeSizes.mother.ellipseB}`,
+    HEADER,
+  ];
   for (const row of rows) {
     lines.push(
       [
@@ -26,17 +38,64 @@ export function toCSV(rows: AnnotationRow[]): string {
   return lines.join("\n") + "\n";
 }
 
-export function fromCSV(text: string): AnnotationRow[] {
-  const lines = text.trim().split("\n");
-  if (lines.length < 2) return [];
+export interface CSVResult {
+  rows: AnnotationRow[];
+  metadata: CSVMetadata | null;
+}
 
-  const header = lines[0].toLowerCase().replace(/\s/g, "");
-  if (!header.includes("frame")) {
+export function fromCSV(text: string): CSVResult {
+  const lines = text.trim().split("\n");
+  if (lines.length < 2) return { rows: [], metadata: null };
+
+  let metadata: CSVMetadata | null = null;
+  let playbackSpeed: number | null = null;
+  let fragmentLength: number | null = null;
+  const shapeSizes: ShapeSizes = structuredClone(DEFAULT_SHAPE_SIZES);
+  let hasMetadata = false;
+
+  // Parse metadata comments
+  let dataStart = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line.startsWith("#")) {
+      dataStart = i;
+      break;
+    }
+    const content = line.slice(1).trim();
+    const pairs = content.split(",");
+    for (const pair of pairs) {
+      const [key, val] = pair.split("=").map((s) => s.trim());
+      const num = parseFloat(val);
+      if (isNaN(num)) continue;
+      hasMetadata = true;
+      switch (key) {
+        case "playback_speed": playbackSpeed = num; break;
+        case "fragment_length": fragmentLength = num; break;
+        case "infant_circle_r": shapeSizes.infant.circleRadius = num; break;
+        case "infant_ellipse_a": shapeSizes.infant.ellipseA = num; break;
+        case "infant_ellipse_b": shapeSizes.infant.ellipseB = num; break;
+        case "mother_circle_r": shapeSizes.mother.circleRadius = num; break;
+        case "mother_ellipse_a": shapeSizes.mother.ellipseA = num; break;
+        case "mother_ellipse_b": shapeSizes.mother.ellipseB = num; break;
+      }
+    }
+  }
+
+  if (hasMetadata) {
+    metadata = {
+      playbackSpeed: playbackSpeed ?? 0.5,
+      shapeSizes,
+      fragmentLength: fragmentLength ?? 30,
+    };
+  }
+
+  const headerLine = lines[dataStart]?.toLowerCase().replace(/\s/g, "") ?? "";
+  if (!headerLine.includes("frame")) {
     throw new Error("Invalid CSV: missing 'frame' column in header");
   }
 
   const rows: AnnotationRow[] = [];
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = dataStart + 1; i < lines.length; i++) {
     const parts = lines[i].split(",");
     if (parts.length < 8) continue;
 
@@ -59,5 +118,5 @@ export function fromCSV(text: string): AnnotationRow[] {
     });
   }
 
-  return rows;
+  return { rows, metadata };
 }
