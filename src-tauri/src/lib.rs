@@ -76,11 +76,20 @@ fn convert_video(path: String) -> Result<String, String> {
     }
 }
 
+#[tauri::command]
+fn get_settings_path() -> Result<String, String> {
+    let dir = dirs::config_dir()
+        .ok_or_else(|| "Could not determine config directory".to_string())?
+        .join("child-lab-annotator");
+    fs::create_dir_all(&dir).map_err(|e| format!("Failed to create config dir: {}", e))?;
+    Ok(dir.join("settings.json").to_string_lossy().into_owned())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![write_text_file, read_text_file, convert_video])
+        .invoke_handler(tauri::generate_handler![write_text_file, read_text_file, convert_video, get_settings_path])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

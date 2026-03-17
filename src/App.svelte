@@ -10,6 +10,7 @@
   import { toCSV, fromCSV, type CSVMetadata } from "./lib/utils/csv";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+  import { untrack } from "svelte";
 
   let target: Target = $state("infant");
   let phase: Phase = $state("position");
@@ -31,6 +32,56 @@
   let fragments = $state<Fragment[]>([]);
   let activeFragmentId = $state<number | null>(null);
   let fragmentLength = $state(30);
+
+  // Settings persistence
+  let settingsPath: string | null = null;
+  let settingsLoaded = false;
+
+  interface Settings {
+    playbackSpeed: number;
+    shapeSizes: ShapeSizes;
+    fragmentLength: number;
+  }
+
+  async function loadSettings() {
+    try {
+      settingsPath = await invoke<string>("get_settings_path");
+      const text = await invoke<string>("read_text_file", { path: settingsPath });
+      const s: Settings = JSON.parse(text);
+      if (typeof s.playbackSpeed === "number") playbackSpeed = s.playbackSpeed;
+      if (s.shapeSizes) shapeSizes = s.shapeSizes;
+      if (typeof s.fragmentLength === "number") fragmentLength = s.fragmentLength;
+    } catch {
+      // No settings file yet — use defaults
+    } finally {
+      settingsLoaded = true;
+    }
+  }
+
+  async function saveSettings() {
+    if (!settingsPath) return;
+    const s: Settings = { playbackSpeed, shapeSizes, fragmentLength };
+    try {
+      await invoke("write_text_file", { path: settingsPath, contents: JSON.stringify(s) });
+    } catch {
+      // Silently ignore save errors
+    }
+  }
+
+  loadSettings();
+
+  let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  $effect(() => {
+    // Track the settings values
+    playbackSpeed;
+    shapeSizes;
+    fragmentLength;
+
+    if (!settingsLoaded) return;
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => untrack(() => saveSettings()), 500);
+  });
 
   let activeFragment = $derived(
     activeFragmentId !== null
