@@ -174,9 +174,9 @@
 
     let defaultPath: string;
     if (activeFragment) {
-      defaultPath = getFragmentAutoSavePath(activeFragment) ?? "smile_annotations.csv";
+      defaultPath = getFragmentAutoSavePath(activeFragment) ?? "smile.csv";
     } else {
-      defaultPath = videoPath ? videoPath.replace(/\.[^.]+$/, "_smile.csv") : "smile_annotations.csv";
+      defaultPath = videoPath ? videoPath.replace(/\.[^.]+$/, "_smile.csv") : "smile.csv";
     }
 
     const file = await save({
@@ -205,7 +205,7 @@
     const endSec = Math.floor(frag.endTime);
     return videoPath.replace(
       /\.[^.]+$/,
-      `_${startSec}s-${endSec}s_smile.csv`
+      `_smile_${startSec}s-${endSec}s.csv`
     );
   }
 

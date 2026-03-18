@@ -176,9 +176,9 @@
 
     let defaultPath: string;
     if (activeFragment) {
-      defaultPath = getFragmentAutoSavePath(activeFragment) ?? "annotations.csv";
+      defaultPath = getFragmentAutoSavePath(activeFragment) ?? "head_tracking.csv";
     } else {
-      defaultPath = videoPath ? videoPath.replace(/\.[^.]+$/, "_annotations.csv") : "annotations.csv";
+      defaultPath = videoPath ? videoPath.replace(/\.[^.]+$/, "_head_tracking.csv") : "head_tracking.csv";
     }
 
     const file = await save({
@@ -197,7 +197,7 @@
 
   function getAutoSavePath(): string | null {
     if (videoPath) {
-      return videoPath.replace(/\.[^.]+$/, "_annotations.csv");
+      return videoPath.replace(/\.[^.]+$/, "_head_tracking.csv");
     }
     return null;
   }
@@ -208,7 +208,7 @@
     const endSec = Math.floor(frag.endTime);
     return videoPath.replace(
       /\.[^.]+$/,
-      `_${startSec}s-${endSec}s_annotations.csv`
+      `_head_tracking_${startSec}s-${endSec}s.csv`
     );
   }
 
