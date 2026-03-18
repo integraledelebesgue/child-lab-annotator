@@ -1,9 +1,8 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import type { Target, Phase, AnnotationRow, ShapeSizes } from "../types";
-  import { TARGET_COLORS, INACTIVE_COLOR } from "../types";
-  import { annotations } from "../stores/annotations";
-  import { angleDeg, dist } from "../utils/geometry";
+  import type { Target, Phase, AnnotationRow, ShapeSizes } from "./types";
+  import { TARGET_COLORS, INACTIVE_COLOR } from "./types";
+  import { angleDeg, dist } from "../../utils/geometry";
 
   interface Props {
     width: number;
@@ -19,6 +18,7 @@
     annotations: AnnotationRow[];
     shapeSizes: ShapeSizes;
     detectedFps: number;
+    onRecord: (frame: number, time: number, target: Target, phase: Phase, data: { x: number; y: number } | { yaw: number }) => void;
   }
 
   let {
@@ -35,6 +35,7 @@
     annotations: annotationRows,
     shapeSizes,
     detectedFps,
+    onRecord,
   }: Props = $props();
 
   let canvasEl = $state<HTMLCanvasElement | null>(null);
@@ -53,8 +54,6 @@
     return { x: px / width, y: py / height };
   }
 
-  /** Get handle position at distance r from center in the yaw direction.
-   *  yaw=0 → up, yaw=90 → right (clockwise). */
   function handlePoint(cx: number, cy: number, r: number, yaw: number): { x: number; y: number } {
     const rad = (yaw * Math.PI) / 180;
     return { x: cx + r * Math.sin(rad), y: cy - r * Math.cos(rad) };
@@ -83,9 +82,9 @@
 
   function recordCurrentState(frame: number, time: number) {
     if (phase === "position") {
-      annotations.recordPosition(frame, time, target, dragX, dragY);
+      onRecord(frame, time, target, phase, { x: dragX, y: dragY });
     } else {
-      annotations.recordOrientation(frame, time, target, dragYaw);
+      onRecord(frame, time, target, phase, { yaw: dragYaw });
     }
     lastRecordedFrame = frame;
   }
@@ -104,7 +103,6 @@
           dragY = pos.y;
         }
       } else {
-        // Orientation phase: position follows phase 1 data
         const pos = getPositionAt(rows, target, frame);
         if (pos) {
           dragX = pos.x;
@@ -116,7 +114,6 @@
         }
       }
     } else if (phase === "orientation") {
-      // Even while dragging orientation, update position from phase 1
       const pos = getPositionAt(rows, target, frame);
       if (pos) {
         dragX = pos.x;
@@ -140,7 +137,6 @@
     const _dragYaw = dragYaw;
     const _target = target;
     const _phase = phase;
-    // Read annotationRows and shapeSizes reactively
     const _rows = annotationRows;
     const _shapeSizes = shapeSizes;
 
@@ -151,7 +147,6 @@
 
     drawTarget(ctx, otherTarget, false, _currentFrame, _rows, _target, _phase, _dragX, _dragY, _dragYaw);
 
-    // Draw position trace in orientation phase (behind the active ellipse)
     if (_phase === "orientation") {
       drawPositionTrace(ctx, _rows, _target, _currentFrame, detectedFps, TARGET_COLORS[_target]);
     }
@@ -183,10 +178,8 @@
       const a = sizes.ellipseA;
       const b = sizes.ellipseB;
       const yaw = active ? dYaw : (getYawAt(rows, t, frame) ?? 0);
-      // Rotate +90° so the long axis (a) aligns with the yaw direction
       const rotRad = ((yaw + 90) * Math.PI) / 180;
 
-      // Draw rotated ellipse
       ctx.beginPath();
       ctx.ellipse(pixel.x, pixel.y, a, b, rotRad, 0, Math.PI * 2);
       ctx.strokeStyle = color;
@@ -195,10 +188,8 @@
       ctx.fillStyle = color + "20";
       ctx.fill();
 
-      // Handle at the "front" of the head (semi-major axis tip in yaw direction)
       const handle = handlePoint(pixel.x, pixel.y, a, yaw);
 
-      // Direction line
       ctx.beginPath();
       ctx.moveTo(pixel.x, pixel.y);
       ctx.lineTo(handle.x, handle.y);
@@ -206,7 +197,6 @@
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Handle dot
       ctx.beginPath();
       ctx.arc(handle.x, handle.y, 6, 0, Math.PI * 2);
       ctx.fillStyle = color;
@@ -215,7 +205,6 @@
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      // Center dot
       ctx.beginPath();
       ctx.arc(pixel.x, pixel.y, 3, 0, Math.PI * 2);
       ctx.fillStyle = color;
@@ -231,7 +220,6 @@
       ctx.fillStyle = color + "20";
       ctx.fill();
 
-      // Center crosshair
       ctx.beginPath();
       ctx.moveTo(pixel.x - 5, pixel.y);
       ctx.lineTo(pixel.x + 5, pixel.y);
@@ -241,7 +229,6 @@
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Show orientation indicator for inactive targets
       if (!active) {
         const yaw = getYawAt(rows, t, frame);
         if (yaw !== null) {
@@ -257,7 +244,6 @@
     }
   }
 
-  /** Draw a trace of upcoming positions (1 second ahead) for the orientation phase. */
   function drawPositionTrace(
     ctx: CanvasRenderingContext2D,
     rows: AnnotationRow[],
@@ -281,10 +267,9 @@
 
     if (points.length === 0) return;
 
-    // Draw connecting line segments with fading opacity
     for (let i = 0; i < points.length - 1; i++) {
       const progress = i / points.length;
-      const alpha = 0.5 - progress * 0.4; // 0.5 → 0.1
+      const alpha = 0.5 - progress * 0.4;
       ctx.beginPath();
       ctx.moveTo(points[i].x, points[i].y);
       ctx.lineTo(points[i + 1].x, points[i + 1].y);
@@ -293,7 +278,6 @@
       ctx.stroke();
     }
 
-    // Draw dots at each point
     for (let i = 0; i < points.length; i++) {
       const progress = i / points.length;
       const alpha = 0.5 - progress * 0.4;
@@ -321,7 +305,6 @@
         isDragging = true;
       }
     } else {
-      // Hit test on the handle dot (at semi-major axis tip)
       const a = sizes.ellipseA;
       const handle = handlePoint(pixel.x, pixel.y, a, dragYaw);
       if (dist(coords.x, coords.y, handle.x, handle.y) <= 12) {

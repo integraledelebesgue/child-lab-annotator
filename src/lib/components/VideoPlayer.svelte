@@ -1,42 +1,45 @@
 <script lang="ts">
-  import CanvasOverlay from "./CanvasOverlay.svelte";
-  import type { Target, Phase, AnnotationRow, ShapeSizes } from "../types";
-  import { annotations } from "../stores/annotations";
+  import type { Snippet } from "svelte";
+
+  interface OverlayParams {
+    displayWidth: number;
+    displayHeight: number;
+    offsetX: number;
+    offsetY: number;
+    videoWidth: number;
+    videoHeight: number;
+  }
 
   interface Props {
     src: string | null;
-    target: Target;
-    phase: Phase;
     playbackSpeed: number;
     isPlaying: boolean;
     currentTime: number;
     duration: number;
     currentFrame: number;
     detectedFps: number;
-    annotations: AnnotationRow[];
-    shapeSizes: ShapeSizes;
     fragmentStartTime: number | null;
     fragmentEndTime: number | null;
     onPhaseComplete: () => void;
     onVideoError: (msg: string) => void;
+    onFrame?: (frame: number, mediaTime: number) => void;
+    overlay?: Snippet<[OverlayParams]>;
   }
 
   let {
     src,
-    target,
-    phase,
     playbackSpeed,
     isPlaying = $bindable(),
     currentTime = $bindable(),
     duration = $bindable(),
     currentFrame = $bindable(),
     detectedFps = $bindable(),
-    annotations: annotationRows,
-    shapeSizes,
     fragmentStartTime,
     fragmentEndTime,
     onPhaseComplete,
     onVideoError,
+    onFrame,
+    overlay,
   }: Props = $props();
 
   let videoEl = $state<HTMLVideoElement | null>(null);
@@ -56,22 +59,6 @@
     if (videoEl) {
       videoEl.playbackRate = playbackSpeed;
     }
-  });
-
-  // Reset video to beginning (or fragment start) when target or phase changes
-  $effect(() => {
-    // Subscribe to target and phase
-    void target;
-    void phase;
-    if (!videoEl) return;
-    videoEl.pause();
-    const seekTo = fragmentStartTime ?? 0;
-    videoEl.currentTime = seekTo;
-    currentTime = seekTo;
-    currentFrame = Math.round(seekTo * detectedFps);
-    isPlaying = false;
-    lastMediaTime = -1;
-    fragmentEndTriggered = false;
   });
 
   // Reset fragmentEndTriggered when fragment changes
@@ -118,7 +105,6 @@
     if (!videoEl) return;
     currentTime = videoEl.currentTime;
 
-    // Fragment boundary enforcement
     if (fragmentEndTime !== null && currentTime >= fragmentEndTime && !fragmentEndTriggered) {
       fragmentEndTriggered = true;
       videoEl.pause();
@@ -159,7 +145,6 @@
       const cb = (now: number, metadata: { mediaTime: number }) => {
         if (!videoEl) return;
 
-        // Fragment boundary check (frame-level precision)
         if (fragmentEndTime !== null && metadata.mediaTime >= fragmentEndTime) {
           if (!fragmentEndTriggered) {
             fragmentEndTriggered = true;
@@ -170,7 +155,6 @@
           return;
         }
 
-        // Detect FPS from first few frame intervals
         if (lastMediaTime >= 0 && fpsProbeCount < 10) {
           const dt = metadata.mediaTime - lastMediaTime;
           if (dt > 0.001 && dt < 0.2) {
@@ -184,7 +168,7 @@
         const frame = Math.round(metadata.mediaTime * detectedFps);
         currentFrame = frame;
         currentTime = metadata.mediaTime;
-        annotations.ensureFrame(frame, metadata.mediaTime);
+        onFrame?.(frame, metadata.mediaTime);
         if (!videoEl.paused && !videoEl.ended) {
           frameCallbackId = (videoEl as any).requestVideoFrameCallback(cb);
         }
@@ -196,7 +180,6 @@
   export function togglePlay() {
     if (!videoEl) return;
     if (videoEl.paused) {
-      // If at fragment end, seek back to start before playing
       if (fragmentEndTime !== null && currentTime >= fragmentEndTime) {
         const seekTo = fragmentStartTime ?? 0;
         videoEl.currentTime = seekTo;
@@ -214,6 +197,7 @@
     if (!videoEl) return;
     videoEl.currentTime = time;
     currentTime = time;
+    currentFrame = Math.round(time * detectedFps);
     fragmentEndTriggered = false;
   }
 
@@ -236,6 +220,17 @@
       videoEl!.addEventListener("seeked", onSeeked);
       videoEl!.currentTime = time;
     });
+  }
+
+  export function resetPlayback(seekTo: number) {
+    if (!videoEl) return;
+    videoEl.pause();
+    videoEl.currentTime = seekTo;
+    currentTime = seekTo;
+    currentFrame = Math.round(seekTo * detectedFps);
+    isPlaying = false;
+    lastMediaTime = -1;
+    fragmentEndTriggered = false;
   }
 
   let resizeObserver: ResizeObserver | null = null;
@@ -264,22 +259,8 @@
       style="width: {displayWidth}px; height: {displayHeight}px; margin-left: {offsetX}px; margin-top: {offsetY}px;"
     ></video>
 
-    {#if displayWidth > 0 && displayHeight > 0}
-      <CanvasOverlay
-        width={displayWidth}
-        height={displayHeight}
-        {offsetX}
-        {offsetY}
-        {videoWidth}
-        {videoHeight}
-        {target}
-        {phase}
-        {currentFrame}
-        {currentTime}
-        annotations={annotationRows}
-        {shapeSizes}
-        {detectedFps}
-      />
+    {#if displayWidth > 0 && displayHeight > 0 && overlay}
+      {@render overlay({ displayWidth, displayHeight, offsetX, offsetY, videoWidth, videoHeight })}
     {/if}
   {:else}
     <div class="placeholder">

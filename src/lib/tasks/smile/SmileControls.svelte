@@ -1,6 +1,5 @@
 <script lang="ts">
   interface Props {
-    active: boolean;
     isPlaying: boolean;
     playbackSpeed: number;
     currentTime: number;
@@ -11,7 +10,16 @@
     onTogglePlay: () => void;
   }
 
-  let { active, isPlaying = $bindable(), playbackSpeed = $bindable(), currentTime, duration, fragmentStartTime, fragmentEndTime, onSeek, onTogglePlay }: Props = $props();
+  let {
+    isPlaying,
+    playbackSpeed = $bindable(),
+    currentTime,
+    duration,
+    fragmentStartTime,
+    fragmentEndTime,
+    onSeek,
+    onTogglePlay,
+  }: Props = $props();
 
   let seekMin = $derived(fragmentStartTime ?? 0);
   let seekMax = $derived(fragmentEndTime ?? (duration || 1));
@@ -20,23 +28,14 @@
   function formatTime(seconds: number): string {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  }
-
-  function onKeydown(e: KeyboardEvent) {
-    if (!active) return;
-    if (e.code === "Space" && e.target === document.body) {
-      e.preventDefault();
-      onTogglePlay();
-    }
+    const ms = Math.floor((seconds % 1) * 1000);
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
   }
 </script>
 
-<svelte:window onkeydown={onKeydown} />
-
 <div class="controls">
   <div class="controls-row">
-    <button class="play-btn" onclick={onTogglePlay} title="Space">
+    <button class="control-btn" onclick={onTogglePlay} title="Space">
       {isPlaying ? "⏸ PAUSE" : "▶ PLAY"}
     </button>
 
@@ -45,7 +44,7 @@
       class="seek-bar"
       min={seekMin}
       max={seekMax}
-      step="0.01"
+      step="0.001"
       value={currentTime}
       oninput={(e) => onSeek(parseFloat(e.currentTarget.value))}
     />
@@ -82,10 +81,10 @@
 
   .controls-row.secondary {
     margin-top: 6px;
-    gap: 8px;
+    gap: 6px;
   }
 
-  .play-btn {
+  .control-btn {
     padding: 6px 14px;
     font-size: 13px;
     flex-shrink: 0;
@@ -105,8 +104,16 @@
     font-size: 12px;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
-    min-width: 100px;
+    min-width: 160px;
     text-align: right;
+    white-space: nowrap;
+  }
+
+  .frame-display {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 50px;
   }
 
   .speed-label {

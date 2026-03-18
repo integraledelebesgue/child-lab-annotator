@@ -1,7 +1,7 @@
 import { writable, get } from "svelte/store";
-import type { AnnotationRow, Target, Phase, PhaseKey } from "../types";
+import type { AnnotationRow, Target, Phase, PhaseKey } from "./types";
 
-function createAnnotationStore() {
+export function createAnnotationStore() {
   const { subscribe, set, update } = writable<AnnotationRow[]>([]);
 
   return {
@@ -92,9 +92,7 @@ function createAnnotationStore() {
   };
 }
 
-export const annotations = createAnnotationStore();
-
-function createCompletedPhasesStore() {
+export function createCompletedPhasesStore() {
   const { subscribe, set, update } = writable<Set<PhaseKey>>(new Set());
 
   return {
@@ -141,5 +139,3 @@ function createCompletedPhasesStore() {
     },
   };
 }
-
-export const completedPhases = createCompletedPhasesStore();

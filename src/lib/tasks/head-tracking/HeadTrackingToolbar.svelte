@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Target, Phase, PhaseKey, ShapeSizes } from "../types";
+    import type { Target, Phase, PhaseKey, ShapeSizes } from "./types";
 
     interface Props {
         target: Target;
@@ -71,7 +71,7 @@
         <label class="radio" class:active={target === "infant"}>
             <input
                 type="radio"
-                name="target"
+                name="ht-target"
                 value="infant"
                 checked={target === "infant"}
                 onchange={() => onTargetChange("infant")}
@@ -82,7 +82,7 @@
         <label class="radio" class:active={target === "mother"}>
             <input
                 type="radio"
-                name="target"
+                name="ht-target"
                 value="mother"
                 checked={target === "mother"}
                 onchange={() => onTargetChange("mother")}
@@ -97,7 +97,7 @@
         <label class="radio" class:active={phase === "position"}>
             <input
                 type="radio"
-                name="phase"
+                name="ht-phase"
                 value="position"
                 checked={phase === "position"}
                 onchange={() => onPhaseChange("position")}
@@ -107,7 +107,7 @@
         <label class="radio" class:active={phase === "orientation"}>
             <input
                 type="radio"
-                name="phase"
+                name="ht-phase"
                 value="orientation"
                 checked={phase === "orientation"}
                 onchange={() => onPhaseChange("orientation")}

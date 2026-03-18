@@ -5,9 +5,10 @@
     fragments: Fragment[];
     activeFragmentId: number | null;
     onSelectFragment: (id: number) => void;
+    getProgress: (frag: Fragment) => string;
   }
 
-  let { fragments, activeFragmentId, onSelectFragment }: Props = $props();
+  let { fragments, activeFragmentId, onSelectFragment, getProgress }: Props = $props();
 
   function formatTime(seconds: number): string {
     const m = Math.floor(seconds / 60);
@@ -41,7 +42,7 @@
             {formatTime(frag.startTime)} – {formatTime(frag.endTime)}
           </span>
           <span class="fragment-phases">
-            {frag.completedPhases.size}/4 phases
+            {getProgress(frag)}
           </span>
         </div>
       </button>
