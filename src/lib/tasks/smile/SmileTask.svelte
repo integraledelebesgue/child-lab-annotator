@@ -328,8 +328,8 @@
 
     const key = e.key.toLowerCase();
 
-    // Intensity change during recording (works regardless of focus)
-    if (activeRecording && ["1", "2", "3"].includes(key)) {
+    // Intensity change — works at any time, regardless of focus or recording state
+    if (["1", "2", "3"].includes(key)) {
       currentIntensity = parseInt(key) as Intensity;
       return;
     }
