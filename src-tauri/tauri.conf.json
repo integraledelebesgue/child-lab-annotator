@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/.tauri/conf.schema.json",
   "productName": "Child Lab Annotator",
-  "version": "1.0.0",
+  "version": "0.2.2",
   "identifier": "com.childlab.annotator",
   "build": {
     "frontendDist": "../dist",
@@ -23,7 +23,9 @@
       "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost; media-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline'",
       "assetProtocol": {
         "enable": true,
-        "scope": ["**"]
+        "scope": [
+          "**"
+        ]
       }
     }
   },
