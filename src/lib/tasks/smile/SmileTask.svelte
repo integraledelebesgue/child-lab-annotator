@@ -324,18 +324,17 @@
   // Keyboard recording
   function onKeydown(e: KeyboardEvent) {
     if (!active) return;
-    if (e.target !== document.body) return;
     if (e.repeat) return;
 
     const key = e.key.toLowerCase();
 
-    // Intensity change during recording
+    // Intensity change during recording (works regardless of focus)
     if (activeRecording && ["1", "2", "3"].includes(key)) {
       currentIntensity = parseInt(key) as Intensity;
       return;
     }
 
-    // Start recording
+    // Start recording (works regardless of focus — seek bar etc. must not block this)
     if (KEY_TO_EXPRESSION[key] && !activeRecording) {
       e.preventDefault();
       const wasPlaying = isPlaying;
@@ -346,12 +345,17 @@
         startFrame: currentFrame,
         wasPlaying,
       };
-      // Auto-play if video was stopped
       if (!wasPlaying) {
         videoPlayer?.togglePlay();
+        // Sync start position after potential seek in togglePlay (e.g. video was at end)
+        activeRecording.startTime = currentTime;
+        activeRecording.startFrame = currentFrame;
       }
       return;
     }
+
+    // Space and Delete/Backspace only fire when focus is on document body
+    if (e.target !== document.body) return;
 
     // Space for play/pause (only when not recording)
     if (e.code === "Space" && !activeRecording) {

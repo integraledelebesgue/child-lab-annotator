@@ -180,7 +180,7 @@
   export function togglePlay() {
     if (!videoEl) return;
     if (videoEl.paused) {
-      if (fragmentEndTime !== null && currentTime >= fragmentEndTime) {
+      if ((fragmentEndTime !== null && currentTime >= fragmentEndTime) || videoEl.ended) {
         const seekTo = fragmentStartTime ?? 0;
         videoEl.currentTime = seekTo;
         currentTime = seekTo;
