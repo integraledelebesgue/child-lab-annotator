@@ -11,6 +11,7 @@
   import { pickAndLoadVideo, getFileName } from "../../utils/video";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { invoke } from "@tauri-apps/api/core";
+  import { getVersion } from "@tauri-apps/api/app";
   import { untrack } from "svelte";
 
   interface Props {
@@ -159,9 +160,13 @@
     }
   }
 
+  let appVersion = $state("unknown");
+  getVersion().then((v) => (appVersion = v)).catch(() => {});
+
   let csvMetadata: SmileCSVMetadata = $derived({
     playbackSpeed,
     fragmentLength,
+    appVersion,
   });
 
   let filename = $derived(videoPath ? getFileName(videoPath) : "");

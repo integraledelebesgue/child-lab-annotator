@@ -6,11 +6,12 @@ const HEADER = "type,intensity,start_time,end_time,duration,start_frame,end_fram
 export interface SmileCSVMetadata {
   playbackSpeed: number;
   fragmentLength: number;
+  appVersion: string;
 }
 
 export function toCSV(events: SmileEvent[], metadata: SmileCSVMetadata, filename: string): string {
   const lines = [
-    `# playback_speed=${metadata.playbackSpeed},fragment_length=${metadata.fragmentLength}`,
+    `# app_version=${metadata.appVersion},playback_speed=${metadata.playbackSpeed},fragment_length=${metadata.fragmentLength}`,
     HEADER,
   ];
   for (const event of events) {

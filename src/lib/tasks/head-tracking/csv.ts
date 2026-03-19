@@ -8,11 +8,12 @@ export interface CSVMetadata {
   playbackSpeed: number;
   shapeSizes: ShapeSizes;
   fragmentLength: number;
+  appVersion: string;
 }
 
 export function toCSV(rows: AnnotationRow[], metadata: CSVMetadata): string {
   const lines = [
-    `# playback_speed=${metadata.playbackSpeed},fragment_length=${metadata.fragmentLength}`,
+    `# app_version=${metadata.appVersion},playback_speed=${metadata.playbackSpeed},fragment_length=${metadata.fragmentLength}`,
     `# infant_circle_r=${metadata.shapeSizes.infant.circleRadius},infant_ellipse_a=${metadata.shapeSizes.infant.ellipseA},infant_ellipse_b=${metadata.shapeSizes.infant.ellipseB}`,
     `# mother_circle_r=${metadata.shapeSizes.mother.circleRadius},mother_ellipse_a=${metadata.shapeSizes.mother.ellipseA},mother_ellipse_b=${metadata.shapeSizes.mother.ellipseB}`,
     HEADER,
