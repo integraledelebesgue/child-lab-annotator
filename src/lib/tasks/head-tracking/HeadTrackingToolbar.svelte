@@ -5,6 +5,7 @@
         target: Target;
         phase: Phase;
         completed: Set<PhaseKey>;
+        videoPath: string | null;
         shapeSizes: ShapeSizes;
         hasVideo: boolean;
         hasFragments: boolean;
@@ -22,6 +23,7 @@
         target,
         phase,
         completed,
+        videoPath,
         shapeSizes = $bindable(),
         hasVideo,
         hasFragments,
@@ -160,6 +162,12 @@
         </label>
     </div>
 
+    {#if videoPath}
+        <div class="toolbar-group filename">
+            <span class="file-label" title={videoPath}>{videoPath}</span>
+        </div>
+    {/if}
+
     <div class="toolbar-group status">
         {#each ["infant", "mother"] as t}
             {#each ["position", "orientation"] as p}
@@ -265,6 +273,20 @@
         font-size: 11px;
         min-width: 18px;
         text-align: right;
+    }
+
+    .filename {
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    .file-label {
+        max-width: 500px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        direction: rtl;
+        text-align: left;
     }
 
     .status {

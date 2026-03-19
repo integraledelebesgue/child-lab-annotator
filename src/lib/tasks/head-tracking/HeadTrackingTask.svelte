@@ -373,6 +373,7 @@
     {target}
     {phase}
     completed={completedPhasesValue}
+    {videoPath}
     bind:shapeSizes
     hasVideo={videoSrc !== null}
     {hasFragments}

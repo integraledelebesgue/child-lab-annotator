@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { getFileName } from "../../utils/video";
 
   interface Props {
     videoPath: string | null;
@@ -60,7 +59,7 @@
 
   {#if videoPath}
     <div class="toolbar-group filename">
-      <span class="file-label">{getFileName(videoPath)}</span>
+      <span class="file-label" title={videoPath}>{videoPath}</span>
     </div>
   {/if}
 
@@ -116,10 +115,12 @@
   }
 
   .file-label {
-    max-width: 200px;
+    max-width: 500px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    direction: rtl;
+    text-align: left;
   }
 
   .status {
