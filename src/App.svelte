@@ -3,10 +3,12 @@
   import TabBar from "./lib/components/TabBar.svelte";
   import HeadTrackingTask from "./lib/tasks/head-tracking/HeadTrackingTask.svelte";
   import SmileTask from "./lib/tasks/smile/SmileTask.svelte";
+  import MutualGazeTask from "./lib/tasks/mutual-gaze/MutualGazeTask.svelte";
 
   const tabs = [
     { id: "head-tracking", label: "Head Tracking" },
     { id: "smile", label: "Smile Annotation" },
+    { id: "mutual-gaze", label: "Mutual Gaze" },
   ];
 
   let activeTab = $state("head-tracking");
@@ -21,6 +23,9 @@
     </div>
     <div class="task-panel" class:hidden={activeTab !== "smile"}>
       <SmileTask active={activeTab === "smile"} />
+    </div>
+    <div class="task-panel" class:hidden={activeTab !== "mutual-gaze"}>
+      <MutualGazeTask active={activeTab === "mutual-gaze"} />
     </div>
   </div>
 </div>

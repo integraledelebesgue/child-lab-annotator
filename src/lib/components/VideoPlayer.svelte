@@ -222,6 +222,16 @@
     });
   }
 
+  export function togglePlayIfPaused() {
+    if (!videoEl || !videoEl.paused) return;
+    videoEl.play();
+  }
+
+  export function pauseIfPlaying() {
+    if (!videoEl || videoEl.paused) return;
+    videoEl.pause();
+  }
+
   export function resetPlayback(seekTo: number) {
     if (!videoEl) return;
     videoEl.pause();
