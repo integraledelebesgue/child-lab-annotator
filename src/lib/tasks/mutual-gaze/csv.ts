@@ -83,17 +83,29 @@ export function fromCSV(text: string): GazeCSVResult {
 export function parseHelperCSV(text: string): HelperData {
   const lines = text.trim().split("\n");
 
-  // Collect data lines (skip comments and header)
-  const dataLines: string[] = [];
-  let headerSkipped = false;
-  for (const line of lines) {
-    const trimmed = line.trim();
+  // Find header and determine column index for average_angle_diff
+  let header = "";
+  let dataStartIdx = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
-    if (!headerSkipped) {
-      headerSkipped = true;
-      continue;
-    }
-    dataLines.push(trimmed);
+    header = trimmed;
+    dataStartIdx = i + 1;
+    break;
+  }
+
+  const columns = header.toLowerCase().replace(/\s/g, "").split(",");
+  const angleCol = columns.indexOf("average_angle_diff");
+  if (angleCol === -1) {
+    throw new Error("Helper CSV missing 'average_angle_diff' column");
+  }
+  const frameCol = columns.indexOf("frame");
+
+  // Collect data lines
+  const dataLines: string[] = [];
+  for (let i = dataStartIdx; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed && !trimmed.startsWith("#")) dataLines.push(trimmed);
   }
 
   if (dataLines.length === 0) {
@@ -103,7 +115,8 @@ export function parseHelperCSV(text: string): HelperData {
   // First pass: find max frame
   let maxFrame = 0;
   for (const line of dataLines) {
-    const frame = parseInt(line, 10);
+    const parts = line.split(",");
+    const frame = parseInt(parts[frameCol >= 0 ? frameCol : 0], 10);
     if (frame > maxFrame) maxFrame = frame;
   }
 
@@ -114,9 +127,9 @@ export function parseHelperCSV(text: string): HelperData {
   // Second pass: populate
   for (const line of dataLines) {
     const parts = line.split(",");
-    if (parts.length < 3) continue;
-    const frame = parseInt(parts[0], 10);
-    const angleDiff = parseFloat(parts[2]);
+    if (parts.length <= angleCol) continue;
+    const frame = parseInt(parts[frameCol >= 0 ? frameCol : 0], 10);
+    const angleDiff = parseFloat(parts[angleCol]);
     if (isNaN(frame) || isNaN(angleDiff)) continue;
     if (frame >= 0 && frame < frameCount) {
       angleDiffs[frame] = angleDiff;
