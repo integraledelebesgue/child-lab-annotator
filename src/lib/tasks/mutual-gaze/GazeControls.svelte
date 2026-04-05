@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { GazePhase } from "./types";
+
   interface Props {
     isPlaying: boolean;
     playbackSpeed: number;
@@ -7,6 +9,7 @@
     fragmentEndTime: number | null;
     isRecording: boolean;
     canStartRecording: boolean;
+    phase: GazePhase;
     onTogglePlay: () => void;
     onMarkStart: () => void;
     onMarkEnd: () => void;
@@ -20,6 +23,7 @@
     fragmentEndTime,
     isRecording,
     canStartRecording,
+    phase,
     onTogglePlay,
     onMarkStart,
     onMarkEnd,
@@ -41,23 +45,25 @@
       {isPlaying ? "⏸ PAUSE" : "▶ PLAY"}
     </button>
 
-    <button
-      class="control-btn mark-btn"
-      class:active={canStartRecording}
-      onclick={onMarkStart}
-      disabled={!canStartRecording}
-    >
-      Mark Start
-    </button>
+    {#if phase === "annotation"}
+      <button
+        class="control-btn mark-btn"
+        class:active={canStartRecording}
+        onclick={onMarkStart}
+        disabled={!canStartRecording}
+      >
+        Mark Start
+      </button>
 
-    <button
-      class="control-btn mark-btn end"
-      class:active={isRecording}
-      onclick={onMarkEnd}
-      disabled={!isRecording}
-    >
-      Mark End
-    </button>
+      <button
+        class="control-btn mark-btn end"
+        class:active={isRecording}
+        onclick={onMarkEnd}
+        disabled={!isRecording}
+      >
+        Mark End
+      </button>
+    {/if}
 
     <span class="time">{formatTime(currentTime)} / {formatTime(displayDuration)}</span>
   </div>

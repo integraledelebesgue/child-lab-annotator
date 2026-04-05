@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { VideoRole } from "./types";
+  import type { VideoRole, GazePhase } from "./types";
   import { VIDEO_ROLE_LABELS } from "./types";
 
   interface Props {
@@ -10,6 +10,8 @@
     eventCount: number;
     hasHelperData: boolean;
     threshold: number;
+    phase: GazePhase;
+    onPhaseChange: (phase: GazePhase) => void;
     onLoadVideo: (role: VideoRole) => void;
     onLoadCSV: () => void;
     onLoadHelperCSV: () => void;
@@ -26,6 +28,8 @@
     eventCount,
     hasHelperData,
     threshold = $bindable(),
+    phase,
+    onPhaseChange,
     onLoadVideo,
     onLoadCSV,
     onLoadHelperCSV,
@@ -52,6 +56,30 @@
         <span class="loaded-indicator"></span>
       {/if}
     </button>
+  </div>
+
+  <div class="toolbar-group">
+    <span class="phase-label">Phase:</span>
+    <label class="radio" class:active={phase === "synchronization"}>
+      <input
+        type="radio"
+        name="gaze-phase"
+        value="synchronization"
+        checked={phase === "synchronization"}
+        onchange={() => onPhaseChange("synchronization")}
+      />
+      Synchronization
+    </label>
+    <label class="radio" class:active={phase === "annotation"}>
+      <input
+        type="radio"
+        name="gaze-phase"
+        value="annotation"
+        checked={phase === "annotation"}
+        onchange={() => onPhaseChange("annotation")}
+      />
+      Annotation
+    </label>
   </div>
 
   <div class="toolbar-group">
@@ -121,6 +149,38 @@
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  .phase-label {
+    color: var(--text-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .radio {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .radio:hover {
+    background: var(--bg-surface);
+  }
+
+  .radio.active {
+    background: var(--bg-surface);
+    border-color: var(--border);
+  }
+
+  .radio input {
+    display: none;
   }
 
   .loaded-indicator {

@@ -4,7 +4,7 @@
   import GazeToolbar from "./GazeToolbar.svelte";
   import GazeControls from "./GazeControls.svelte";
   import GazeTimeline from "./GazeTimeline.svelte";
-  import type { GazeEvent, GazeFragment, VideoRole, HelperData } from "./types";
+  import type { GazeEvent, GazeFragment, VideoRole, GazePhase, HelperData } from "./types";
   import { VIDEO_ROLES, VIDEO_ROLE_LABELS } from "./types";
   import { toCSV, fromCSV, parseHelperCSV, type GazeCSVMetadata } from "./csv";
   import { pickAndLoadVideo } from "../../utils/video";
@@ -58,6 +58,15 @@
   let infantFps = $state(30);
   let infantPlaying = $state(false);
 
+  // Phase & offsets
+  let phase: GazePhase = $state("synchronization");
+  let motherOffset = $state(0);
+  let ceilingOffset = $state(0);
+  let infantOffset = $state(0);
+
+  let effectiveMotherOffset = $derived(motherOffset - ceilingOffset);
+  let effectiveInfantOffset = $derived(infantOffset - ceilingOffset);
+
   // Helper data
   let helperData = $state<HelperData | null>(null);
   let threshold = $state(30);
@@ -97,6 +106,9 @@
     playbackSpeed: number;
     fragmentLength: number;
     threshold: number;
+    motherOffset: number;
+    ceilingOffset: number;
+    infantOffset: number;
   }
 
   async function loadSettings() {
@@ -108,6 +120,9 @@
       if (typeof s.playbackSpeed === "number") playbackSpeed = s.playbackSpeed;
       if (typeof s.fragmentLength === "number") fragmentLength = s.fragmentLength;
       if (typeof s.threshold === "number") threshold = s.threshold;
+      if (typeof s.motherOffset === "number") motherOffset = s.motherOffset;
+      if (typeof s.ceilingOffset === "number") ceilingOffset = s.ceilingOffset;
+      if (typeof s.infantOffset === "number") infantOffset = s.infantOffset;
     } catch {
       // No settings file yet
     } finally {
@@ -117,7 +132,7 @@
 
   async function saveSettings() {
     if (!settingsPath) return;
-    const s: Settings = { playbackSpeed, fragmentLength, threshold };
+    const s: Settings = { playbackSpeed, fragmentLength, threshold, motherOffset, ceilingOffset, infantOffset };
     try {
       let all: Record<string, any> = {};
       try {
@@ -142,10 +157,36 @@
     playbackSpeed;
     fragmentLength;
     threshold;
+    motherOffset;
+    ceilingOffset;
+    infantOffset;
 
     if (!settingsLoaded) return;
     if (saveTimeout) clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => untrack(() => saveSettings()), 500);
+  });
+
+  $effect(() => {
+    void phase;
+    untrack(() => {
+      const seekTo = activeFragment?.startTime ?? 0;
+      seekAll(seekTo);
+      isPlaying = false;
+    });
+  });
+
+  // Seek videos in real-time when offsets change during sync phase
+  $effect(() => {
+    motherOffset;
+    ceilingOffset;
+    infantOffset;
+    untrack(() => {
+      if (phase !== "synchronization") return;
+      const base = activeFragment?.startTime ?? 0;
+      ceilingPlayer?.seek(base + ceilingOffset);
+      motherPlayer?.seek(base + motherOffset);
+      infantPlayer?.seek(base + infantOffset);
+    });
   });
 
   let activeFragment = $derived(
@@ -196,6 +237,9 @@
         playbackSpeed = result.metadata.playbackSpeed;
         fragmentLength = result.metadata.fragmentLength;
         threshold = result.metadata.threshold;
+        motherOffset = result.metadata.motherOffset;
+        ceilingOffset = result.metadata.ceilingOffset;
+        infantOffset = result.metadata.infantOffset;
       }
       showToast(`Loaded ${result.events.length} events from CSV`);
     } catch (e: any) {
@@ -230,6 +274,9 @@
     playbackSpeed,
     fragmentLength,
     threshold,
+    motherOffset,
+    ceilingOffset,
+    infantOffset,
     appVersion,
   });
 
@@ -318,8 +365,8 @@
   }
 
   function syncSecondaryPlayers() {
-    motherPlayer?.seek(currentTime);
-    infantPlayer?.seek(currentTime);
+    motherPlayer?.seek(currentTime + effectiveMotherOffset);
+    infantPlayer?.seek(currentTime + effectiveInfantOffset);
   }
 
   function playAll() {
@@ -399,8 +446,8 @@
 
   function seekAll(time: number) {
     ceilingPlayer?.seek(time);
-    motherPlayer?.seek(time);
-    infantPlayer?.seek(time);
+    motherPlayer?.seek(time + effectiveMotherOffset);
+    infantPlayer?.seek(time + effectiveInfantOffset);
   }
 
   function togglePlayAll() {
@@ -412,6 +459,10 @@
       ceilingPlayer?.togglePlay();
       playAll();
     }
+  }
+
+  function changePhase(p: GazePhase) {
+    phase = p;
   }
 
   function markStart() {
@@ -466,6 +517,8 @@
     eventCount={events.length}
     {hasHelperData}
     bind:threshold
+    {phase}
+    onPhaseChange={changePhase}
     onLoadVideo={loadVideo}
     onLoadCSV={loadCSV}
     onLoadHelperCSV={loadHelperCSV}
@@ -537,6 +590,27 @@
                 />
               {/if}
             </div>
+            {#if phase === "synchronization" && role === "mother"}
+              <div class="offset-bar">
+                <span class="offset-label">Offset:</span>
+                <input type="range" class="offset-slider" min="0" max="2" step={1 / detectedFps} bind:value={motherOffset} />
+                <span class="offset-value">{motherOffset.toFixed(3)}s</span>
+              </div>
+            {/if}
+            {#if phase === "synchronization" && role === "ceiling"}
+              <div class="offset-bar">
+                <span class="offset-label">Offset:</span>
+                <input type="range" class="offset-slider" min="0" max="2" step={1 / detectedFps} bind:value={ceilingOffset} />
+                <span class="offset-value">{ceilingOffset.toFixed(3)}s</span>
+              </div>
+            {/if}
+            {#if phase === "synchronization" && role === "infant"}
+              <div class="offset-bar">
+                <span class="offset-label">Offset:</span>
+                <input type="range" class="offset-slider" min="0" max="2" step={1 / detectedFps} bind:value={infantOffset} />
+                <span class="offset-value">{infantOffset.toFixed(3)}s</span>
+              </div>
+            {/if}
           </div>
         {/each}
       </div>
@@ -558,6 +632,7 @@
     fragmentEndTime={activeFragment?.endTime ?? null}
     {isRecording}
     canStartRecording={!isRecording && !isOnEvent}
+    {phase}
     onTogglePlay={togglePlayAll}
     onMarkStart={markStart}
     onMarkEnd={markEnd}
@@ -634,6 +709,36 @@
     flex: 1;
     min-height: 0;
     position: relative;
+  }
+
+  .offset-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+  }
+
+  .offset-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .offset-slider {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--accent-active);
+  }
+
+  .offset-value {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-active);
+    min-width: 52px;
+    text-align: right;
+    flex-shrink: 0;
   }
 
   .converting-overlay {

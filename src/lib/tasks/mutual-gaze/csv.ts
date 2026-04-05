@@ -7,12 +7,15 @@ export interface GazeCSVMetadata {
   playbackSpeed: number;
   fragmentLength: number;
   threshold: number;
+  motherOffset: number;
+  ceilingOffset: number;
+  infantOffset: number;
   appVersion: string;
 }
 
 export function toCSV(events: GazeEvent[], metadata: GazeCSVMetadata): string {
   const lines = [
-    `# app_version=${metadata.appVersion},playback_speed=${metadata.playbackSpeed},fragment_length=${metadata.fragmentLength},threshold=${metadata.threshold}`,
+    `# app_version=${metadata.appVersion},playback_speed=${metadata.playbackSpeed},fragment_length=${metadata.fragmentLength},threshold=${metadata.threshold},mother_offset=${metadata.motherOffset},ceiling_offset=${metadata.ceilingOffset},infant_offset=${metadata.infantOffset}`,
     HEADER,
   ];
   for (const event of events) {
@@ -47,6 +50,9 @@ export function fromCSV(text: string): GazeCSVResult {
       playbackSpeed: raw.playback_speed ?? 0.5,
       fragmentLength: raw.fragment_length ?? 30,
       threshold: raw.threshold ?? 30,
+      motherOffset: raw.mother_offset ?? 0,
+      ceilingOffset: raw.ceiling_offset ?? 0,
+      infantOffset: raw.infant_offset ?? 0,
       appVersion: String(raw.app_version ?? "unknown"),
     };
   }

@@ -18,6 +18,8 @@ export interface HelperData {
   frameCount: number;
 }
 
+export type GazePhase = "synchronization" | "annotation";
+
 export type VideoRole = "mother" | "ceiling" | "infant";
 
 export const VIDEO_ROLES: VideoRole[] = ["mother", "ceiling", "infant"];
