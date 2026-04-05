@@ -124,15 +124,16 @@
         if (frame < 0 || frame >= _helperData.frameCount || !_helperData.valid[frame]) continue;
 
         const absAngle = Math.abs(_helperData.angleDiffs[frame]);
-        if (absAngle > _threshold) continue;
+        if (absAngle >= _threshold) continue;
 
-        const t = _threshold > 0 ? absAngle / _threshold : 0;
+        // intensity = how much below threshold (1 = far below, 0 = at threshold)
+        const intensity = _threshold > 0 ? 1 - absAngle / _threshold : 1;
 
-        // Green #22c55e (34,197,94) → Yellow #eab308 (234,179,8)
-        const r = Math.round(34 + t * (234 - 34));
-        const g = Math.round(197 + t * (179 - 197));
-        const b = Math.round(94 + t * (8 - 94));
-        const alpha = Math.round(160 * (1 - t * 0.6));
+        // Green #22c55e (34, 197, 94) with alpha proportional to intensity
+        const r = 34;
+        const g = 197;
+        const b = 94;
+        const alpha = Math.round(180 * intensity);
 
         for (let y = 0; y < ph; y++) {
           const idx = (y * pw + px) * 4;
