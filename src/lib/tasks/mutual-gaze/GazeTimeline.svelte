@@ -1,6 +1,11 @@
 <script lang="ts">
   import type { GazeEvent, HelperData } from "./types";
 
+  export interface TimelineMenuItem {
+    label: string;
+    action: (eventId: number) => void;
+  }
+
   interface Props {
     helperData: HelperData | null;
     threshold: number;
@@ -11,6 +16,7 @@
     fragmentStartTime: number | null;
     fragmentEndTime: number | null;
     recordingStartTime: number | null;
+    menuItems: TimelineMenuItem[];
     onSeek: (time: number) => void;
   }
 
@@ -24,11 +30,12 @@
     fragmentStartTime,
     fragmentEndTime,
     recordingStartTime,
+    menuItems,
     onSeek,
   }: Props = $props();
 
   const CANVAS_HEIGHT = 64;
-  const EVENT_HEIGHT = 8;
+  const EVENT_HEIGHT = 16;
   const EVENT_MARGIN = 4;
 
   let containerEl = $state<HTMLDivElement | null>(null);
@@ -96,6 +103,7 @@
     const _rangeEnd = rangeEnd;
     const _rangeDuration = rangeDuration;
     const _recordingStart = recordingStartTime;
+    const _hoveredId = hoveredEventId;
 
     const dpr = window.devicePixelRatio || 1;
     const w = canvasWidth;
@@ -152,11 +160,13 @@
 
     // Layer 2: Event bars — centered on ruler line
     const eventY = midY - EVENT_HEIGHT / 2;
-    ctx.fillStyle = "rgba(245, 158, 11, 0.45)";
     for (const event of _events) {
       const x1 = timeToX(event.startTime);
       const x2 = timeToX(event.endTime);
       const barWidth = Math.max(x2 - x1, 2);
+      ctx.fillStyle = event.id === _hoveredId
+        ? "rgba(245, 158, 11, 0.8)"
+        : "rgba(245, 158, 11, 0.45)";
       ctx.fillRect(x1, eventY, barWidth, EVENT_HEIGHT);
     }
 
@@ -218,6 +228,40 @@
     ctx.stroke();
   });
 
+  // Hover state
+  let hoveredEventId = $state<number | null>(null);
+
+  function onCanvasMouseMove(e: MouseEvent) {
+    if (isDragging || contextMenu) return;
+    if (!canvasEl) return;
+    const rect = canvasEl.getBoundingClientRect();
+    const hit = hitTestEvent(e.clientX - rect.left, e.clientY - rect.top);
+    hoveredEventId = hit?.id ?? null;
+  }
+
+  function onCanvasMouseLeave() {
+    if (!isDragging) hoveredEventId = null;
+  }
+
+  // Context menu
+  let contextMenu = $state<{ eventId: number; x: number; y: number } | null>(null);
+
+  function hitTestEvent(x: number, y: number): GazeEvent | null {
+    const midY = CANVAS_HEIGHT / 2;
+    const eventY = midY - EVENT_HEIGHT / 2;
+    if (y < eventY || y > eventY + EVENT_HEIGHT) return null;
+    const time = xToTime(x);
+    for (const event of events) {
+      if (time >= event.startTime && time <= event.endTime) return event;
+    }
+    return null;
+  }
+
+  function closeMenu() {
+    contextMenu = null;
+  }
+
+  // Dragging
   let isDragging = false;
 
   function seekFromMouse(e: MouseEvent) {
@@ -230,6 +274,24 @@
 
   function onMouseDown(e: MouseEvent) {
     if (recordingStartTime !== null) return;
+
+    // Close menu if open
+    if (contextMenu) {
+      closeMenu();
+      return;
+    }
+
+    // Hit-test event bars
+    if (!canvasEl) return;
+    const rect = canvasEl.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const hit = hitTestEvent(x, y);
+    if (hit) {
+      contextMenu = { eventId: hit.id, x: e.clientX, y: e.clientY };
+      return;
+    }
+
     isDragging = true;
     seekFromMouse(e);
     window.addEventListener("mousemove", onMouseMove);
@@ -248,11 +310,35 @@
   }
 </script>
 
+{#if contextMenu}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="menu-backdrop" onmousedown={closeMenu}></div>
+{/if}
+
 <div class="timeline-container" bind:this={containerEl}>
   <canvas
     bind:this={canvasEl}
     onmousedown={onMouseDown}
+    onmousemove={onCanvasMouseMove}
+    onmouseleave={onCanvasMouseLeave}
+    style:cursor={hoveredEventId !== null ? "pointer" : "default"}
   ></canvas>
+
+  {#if contextMenu}
+    <div
+      class="event-menu"
+      style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
+    >
+      {#each menuItems as item}
+        <button
+          class="menu-item"
+          onclick={() => { item.action(contextMenu!.eventId); closeMenu(); }}
+        >
+          {item.label}
+        </button>
+      {/each}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -262,9 +348,46 @@
     background: var(--bg-secondary);
     border-top: 1px solid var(--border);
     cursor: pointer;
+    position: relative;
   }
 
   canvas {
     display: block;
+  }
+
+  .menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+  }
+
+  .event-menu {
+    position: fixed;
+    z-index: 100;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    min-width: 100px;
+  }
+
+  .menu-item {
+    display: block;
+    width: 100%;
+    padding: 6px 12px;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .menu-item:hover {
+    background: var(--bg-secondary);
   }
 </style>

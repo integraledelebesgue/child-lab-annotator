@@ -486,6 +486,16 @@
     activeRecording = null;
   }
 
+  function deleteEvent(id: number) {
+    events = events.filter((e) => e.id !== id);
+  }
+
+  import type { TimelineMenuItem } from "./GazeTimeline.svelte";
+
+  const timelineMenuItems: TimelineMenuItem[] = [
+    { label: "Delete", action: deleteEvent },
+  ];
+
   function onKeydown(e: KeyboardEvent) {
     if (!active) return;
     if (e.repeat) return;
@@ -648,6 +658,7 @@
     fragmentStartTime={activeFragment?.startTime ?? null}
     fragmentEndTime={activeFragment?.endTime ?? null}
     recordingStartTime={activeRecording?.startTime ?? null}
+    menuItems={timelineMenuItems}
     onSeek={seekAll}
   />
 
