@@ -3,6 +3,16 @@ export function formatNum(v: number | null): string {
   return v.toFixed(4);
 }
 
+/** Build a column-name → index map from a CSV header line. */
+export function columnMap(headerLine: string): Record<string, number> {
+  const map: Record<string, number> = {};
+  const cols = headerLine.toLowerCase().replace(/\s/g, "").split(",");
+  for (let i = 0; i < cols.length; i++) {
+    map[cols[i]] = i;
+  }
+  return map;
+}
+
 export function parseMetadataComments(lines: string[]): { metadata: Record<string, number>; dataStart: number } {
   const metadata: Record<string, number> = {};
   let dataStart = 0;

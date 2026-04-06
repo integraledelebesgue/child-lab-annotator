@@ -1,6 +1,6 @@
 import type { AnnotationRow, ShapeSizes } from "./types";
 import { DEFAULT_SHAPE_SIZES } from "./types";
-import { formatNum, parseMetadataComments } from "../../utils/csv";
+import { formatNum, parseMetadataComments, columnMap } from "../../utils/csv";
 
 const HEADER = "frame,timestamp,infant_x,infant_y,infant_yaw,mother_x,mother_y,mother_yaw";
 
@@ -63,32 +63,36 @@ export function fromCSV(text: string): CSVResult {
     };
   }
 
-  const headerLine = lines[dataStart]?.toLowerCase().replace(/\s/g, "") ?? "";
-  if (!headerLine.includes("frame")) {
+  const headerLine = lines[dataStart] ?? "";
+  const col = columnMap(headerLine);
+  if (col.frame === undefined) {
     throw new Error("Invalid CSV: missing 'frame' column in header");
   }
 
   const rows: AnnotationRow[] = [];
   for (let i = dataStart + 1; i < lines.length; i++) {
     const parts = lines[i].split(",");
-    if (parts.length < 8) continue;
 
-    const parseOpt = (s: string): number | null => {
-      const trimmed = s.trim();
+    const parseOpt = (idx: number | undefined): number | null => {
+      if (idx === undefined) return null;
+      const trimmed = (parts[idx] ?? "").trim();
       if (trimmed === "") return null;
       const n = parseFloat(trimmed);
       return isNaN(n) ? null : n;
     };
 
+    const frame = parseInt(parts[col.frame] ?? "", 10);
+    if (isNaN(frame)) continue;
+
     rows.push({
-      frame: parseInt(parts[0], 10),
-      timestamp: parseFloat(parts[1]) || 0,
-      infantX: parseOpt(parts[2]),
-      infantY: parseOpt(parts[3]),
-      infantYaw: parseOpt(parts[4]),
-      motherX: parseOpt(parts[5]),
-      motherY: parseOpt(parts[6]),
-      motherYaw: parseOpt(parts[7]),
+      frame,
+      timestamp: parseFloat(parts[col.timestamp] ?? "") || 0,
+      infantX: parseOpt(col.infant_x),
+      infantY: parseOpt(col.infant_y),
+      infantYaw: parseOpt(col.infant_yaw),
+      motherX: parseOpt(col.mother_x),
+      motherY: parseOpt(col.mother_y),
+      motherYaw: parseOpt(col.mother_yaw),
     });
   }
 

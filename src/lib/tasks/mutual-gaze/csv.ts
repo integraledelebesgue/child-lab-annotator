@@ -1,5 +1,5 @@
 import type { GazeEvent, HelperData } from "./types";
-import { parseMetadataComments } from "../../utils/csv";
+import { parseMetadataComments, columnMap } from "../../utils/csv";
 
 const HEADER = "start_time,end_time,duration,start_frame,end_frame";
 
@@ -57,8 +57,9 @@ export function fromCSV(text: string): GazeCSVResult {
     };
   }
 
-  const headerLine = lines[dataStart]?.toLowerCase().replace(/\s/g, "") ?? "";
-  if (!headerLine.includes("start_time")) {
+  const headerLine = lines[dataStart] ?? "";
+  const col = columnMap(headerLine);
+  if (col.start_time === undefined) {
     throw new Error("Invalid CSV: missing 'start_time' column in header");
   }
 
@@ -66,14 +67,13 @@ export function fromCSV(text: string): GazeCSVResult {
   let nextId = 0;
   for (let i = dataStart + 1; i < lines.length; i++) {
     const parts = lines[i].split(",");
-    if (parts.length < 5) continue;
 
     events.push({
       id: nextId++,
-      startTime: parseFloat(parts[0]) || 0,
-      endTime: parseFloat(parts[1]) || 0,
-      startFrame: parseInt(parts[3], 10) || 0,
-      endFrame: parseInt(parts[4], 10) || 0,
+      startTime: parseFloat(parts[col.start_time] ?? "") || 0,
+      endTime: parseFloat(parts[col.end_time] ?? "") || 0,
+      startFrame: parseInt(parts[col.start_frame] ?? "", 10) || 0,
+      endFrame: parseInt(parts[col.end_frame] ?? "", 10) || 0,
     });
   }
 
@@ -83,23 +83,23 @@ export function fromCSV(text: string): GazeCSVResult {
 export function parseHelperCSV(text: string): HelperData {
   const lines = text.trim().split("\n");
 
-  // Find header and determine column index for average_angle_diff
-  let header = "";
+  // Find header and determine column indices
+  let headerLine = "";
   let dataStartIdx = 0;
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
-    header = trimmed;
+    headerLine = trimmed;
     dataStartIdx = i + 1;
     break;
   }
 
-  const columns = header.toLowerCase().replace(/\s/g, "").split(",");
-  const angleCol = columns.indexOf("average_angle_diff");
-  if (angleCol === -1) {
+  const col = columnMap(headerLine);
+  if (col.average_angle_diff === undefined) {
     throw new Error("Helper CSV missing 'average_angle_diff' column");
   }
-  const frameCol = columns.indexOf("frame");
+  const angleCol = col.average_angle_diff;
+  const frameCol = col.frame ?? 0;
 
   // Collect data lines
   const dataLines: string[] = [];

@@ -1,5 +1,5 @@
 import type { SmileEvent, ExpressionType, Intensity } from "./types";
-import { parseMetadataComments } from "../../utils/csv";
+import { parseMetadataComments, columnMap } from "../../utils/csv";
 
 const HEADER = "type,intensity,start_time,end_time,duration,start_frame,end_frame,filename";
 
@@ -51,8 +51,9 @@ export function fromCSV(text: string): SmileCSVResult {
     };
   }
 
-  const headerLine = lines[dataStart]?.toLowerCase().replace(/\s/g, "") ?? "";
-  if (!headerLine.includes("type")) {
+  const headerLine = lines[dataStart] ?? "";
+  const col = columnMap(headerLine);
+  if (col.type === undefined) {
     throw new Error("Invalid CSV: missing 'type' column in header");
   }
 
@@ -60,22 +61,21 @@ export function fromCSV(text: string): SmileCSVResult {
   let nextId = 0;
   for (let i = dataStart + 1; i < lines.length; i++) {
     const parts = lines[i].split(",");
-    if (parts.length < 7) continue;
 
-    const type = parts[0].trim() as ExpressionType;
+    const type = (parts[col.type] ?? "").trim() as ExpressionType;
     if (!["full", "eye", "mouth"].includes(type)) continue;
 
-    const intensity = parseInt(parts[1].trim(), 10) as Intensity;
+    const intensity = parseInt((parts[col.intensity] ?? "").trim(), 10) as Intensity;
     if (![1, 2, 3].includes(intensity)) continue;
 
     events.push({
       id: nextId++,
       type,
       intensity,
-      startTime: parseFloat(parts[2]) || 0,
-      endTime: parseFloat(parts[3]) || 0,
-      startFrame: parseInt(parts[5], 10) || 0,
-      endFrame: parseInt(parts[6], 10) || 0,
+      startTime: parseFloat(parts[col.start_time] ?? "") || 0,
+      endTime: parseFloat(parts[col.end_time] ?? "") || 0,
+      startFrame: parseInt(parts[col.start_frame] ?? "", 10) || 0,
+      endFrame: parseInt(parts[col.end_frame] ?? "", 10) || 0,
     });
   }
 
