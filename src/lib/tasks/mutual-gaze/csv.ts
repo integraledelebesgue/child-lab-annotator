@@ -80,7 +80,38 @@ export function fromCSV(text: string): GazeCSVResult {
   return { events, metadata: csvMetadata };
 }
 
-export function parseHelperCSV(text: string): HelperData {
+/** Smallest signed difference between two angles in degrees. */
+function angleDiff(a: number, b: number): number {
+  let d = ((a - b) % 360 + 360) % 360;
+  if (d > 180) d -= 360;
+  return d;
+}
+
+const DEG = 180 / Math.PI;
+
+/** Compute average angle diff from head-tracking coordinates. */
+function computeAverageAngleDiff(
+  infantX: number, infantY: number, infantYaw: number,
+  motherX: number, motherY: number, motherYaw: number,
+  videoWidth: number, videoHeight: number,
+): number {
+  const ixp = infantX * videoWidth;
+  const iyp = infantY * videoHeight;
+  const mxp = motherX * videoWidth;
+  const myp = motherY * videoHeight;
+
+  const bearingI2M = Math.atan2(myp - iyp, mxp - ixp) * DEG;
+  const bearingM2I = Math.atan2(iyp - myp, ixp - mxp) * DEG;
+
+  const infantDiff = angleDiff(infantYaw - 90, bearingI2M);
+  const motherDiff = angleDiff(motherYaw - 90, bearingM2I);
+
+  return (infantDiff + motherDiff) / 2;
+}
+
+const HEAD_TRACKING_COLS = ["infant_x", "infant_y", "infant_yaw", "mother_x", "mother_y", "mother_yaw"] as const;
+
+export function parseHelperCSV(text: string, videoWidth = 1, videoHeight = 1): HelperData {
   const lines = text.trim().split("\n");
 
   // Find header and determine column indices
@@ -95,11 +126,17 @@ export function parseHelperCSV(text: string): HelperData {
   }
 
   const col = columnMap(headerLine);
-  if (col.average_angle_diff === undefined) {
-    throw new Error("Helper CSV missing 'average_angle_diff' column");
-  }
-  const angleCol = col.average_angle_diff;
   const frameCol = col.frame ?? 0;
+
+  const hasAngleCol = col.average_angle_diff !== undefined;
+  const hasHeadTrackingCols = HEAD_TRACKING_COLS.every((c) => col[c] !== undefined);
+
+  if (!hasAngleCol && !hasHeadTrackingCols) {
+    throw new Error(
+      "Helper CSV must contain either 'average_angle_diff' or head-tracking columns " +
+      "(infant_x, infant_y, infant_yaw, mother_x, mother_y, mother_yaw)"
+    );
+  }
 
   // Collect data lines
   const dataLines: string[] = [];
@@ -116,7 +153,7 @@ export function parseHelperCSV(text: string): HelperData {
   let maxFrame = 0;
   for (const line of dataLines) {
     const parts = line.split(",");
-    const frame = parseInt(parts[frameCol >= 0 ? frameCol : 0], 10);
+    const frame = parseInt(parts[frameCol], 10);
     if (frame > maxFrame) maxFrame = frame;
   }
 
@@ -125,14 +162,41 @@ export function parseHelperCSV(text: string): HelperData {
   const valid = new Uint8Array(frameCount);
 
   // Second pass: populate
-  for (const line of dataLines) {
-    const parts = line.split(",");
-    if (parts.length <= angleCol) continue;
-    const frame = parseInt(parts[frameCol >= 0 ? frameCol : 0], 10);
-    const angleDiff = parseFloat(parts[angleCol]);
-    if (isNaN(frame) || isNaN(angleDiff)) continue;
-    if (frame >= 0 && frame < frameCount) {
-      angleDiffs[frame] = angleDiff;
+  if (hasAngleCol) {
+    const angleCol = col.average_angle_diff!;
+    for (const line of dataLines) {
+      const parts = line.split(",");
+      const frame = parseInt(parts[frameCol], 10);
+      const diff = parseFloat(parts[angleCol]);
+      if (isNaN(frame) || isNaN(diff)) continue;
+      if (frame >= 0 && frame < frameCount) {
+        angleDiffs[frame] = diff;
+        valid[frame] = 1;
+      }
+    }
+  } else {
+    const ixCol = col.infant_x!;
+    const iyCol = col.infant_y!;
+    const iyawCol = col.infant_yaw!;
+    const mxCol = col.mother_x!;
+    const myCol = col.mother_y!;
+    const myawCol = col.mother_yaw!;
+
+    for (const line of dataLines) {
+      const parts = line.split(",");
+      const frame = parseInt(parts[frameCol], 10);
+      if (isNaN(frame) || frame < 0 || frame >= frameCount) continue;
+
+      const ix = parseFloat(parts[ixCol]);
+      const iy = parseFloat(parts[iyCol]);
+      const iyaw = parseFloat(parts[iyawCol]);
+      const mx = parseFloat(parts[mxCol]);
+      const my = parseFloat(parts[myCol]);
+      const myaw = parseFloat(parts[myawCol]);
+
+      if (isNaN(ix) || isNaN(iy) || isNaN(iyaw) || isNaN(mx) || isNaN(my) || isNaN(myaw)) continue;
+
+      angleDiffs[frame] = computeAverageAngleDiff(ix, iy, iyaw, mx, my, myaw, videoWidth, videoHeight);
       valid[frame] = 1;
     }
   }

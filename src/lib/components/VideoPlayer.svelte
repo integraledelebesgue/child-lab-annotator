@@ -18,6 +18,8 @@
     duration: number;
     currentFrame: number;
     detectedFps: number;
+    videoWidth?: number;
+    videoHeight?: number;
     fragmentStartTime: number | null;
     fragmentEndTime: number | null;
     onPhaseComplete: () => void;
@@ -34,6 +36,8 @@
     duration = $bindable(),
     currentFrame = $bindable(),
     detectedFps = $bindable(),
+    videoWidth = $bindable(0),
+    videoHeight = $bindable(0),
     fragmentStartTime,
     fragmentEndTime,
     onPhaseComplete,
@@ -44,8 +48,6 @@
 
   let videoEl = $state<HTMLVideoElement | null>(null);
   let containerEl = $state<HTMLDivElement | null>(null);
-  let videoWidth = $state(0);
-  let videoHeight = $state(0);
   let displayWidth = $state(0);
   let displayHeight = $state(0);
   let offsetX = $state(0);

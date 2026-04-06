@@ -25,6 +25,8 @@
   let duration = $state(0);
   let currentFrame = $state(0);
   let detectedFps = $state(30);
+  let ceilingVideoWidth = $state(0);
+  let ceilingVideoHeight = $state(0);
   let toast = $state<string | null>(null);
   let toastTimeout: ReturnType<typeof setTimeout> | null = null;
   let isConverting = $state(false);
@@ -255,7 +257,7 @@
     if (!file) return;
     try {
       const text = await invoke<string>("read_text_file", { path: file });
-      const data = parseHelperCSV(text);
+      const data = parseHelperCSV(text, ceilingVideoWidth || 1, ceilingVideoHeight || 1);
       if (data.frameCount === 0) {
         showToast("Helper CSV is empty or invalid");
         return;
@@ -563,6 +565,8 @@
                   bind:duration
                   bind:currentFrame
                   bind:detectedFps
+                  bind:videoWidth={ceilingVideoWidth}
+                  bind:videoHeight={ceilingVideoHeight}
                   fragmentStartTime={activeFragment?.startTime ?? null}
                   fragmentEndTime={activeFragment?.endTime ?? null}
                   {onPhaseComplete}
