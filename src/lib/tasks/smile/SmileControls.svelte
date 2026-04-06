@@ -4,9 +4,7 @@
     playbackSpeed: number;
     currentTime: number;
     duration: number;
-    fragmentStartTime: number | null;
     fragmentEndTime: number | null;
-    onSeek: (time: number) => void;
     onTogglePlay: () => void;
   }
 
@@ -15,14 +13,10 @@
     playbackSpeed = $bindable(),
     currentTime,
     duration,
-    fragmentStartTime,
     fragmentEndTime,
-    onSeek,
     onTogglePlay,
   }: Props = $props();
 
-  let seekMin = $derived(fragmentStartTime ?? 0);
-  let seekMax = $derived(fragmentEndTime ?? (duration || 1));
   let displayDuration = $derived(fragmentEndTime ?? duration);
 
   function formatTime(seconds: number): string {
@@ -38,16 +32,6 @@
     <button class="control-btn" onclick={onTogglePlay} title="Space">
       {isPlaying ? "⏸ PAUSE" : "▶ PLAY"}
     </button>
-
-    <input
-      type="range"
-      class="seek-bar"
-      min={seekMin}
-      max={seekMax}
-      step="0.001"
-      value={currentTime}
-      oninput={(e) => onSeek(parseFloat(e.currentTarget.value))}
-    />
 
     <span class="time">{formatTime(currentTime)} / {formatTime(displayDuration)}</span>
   </div>
@@ -94,12 +78,6 @@
     text-align: center;
   }
 
-  .seek-bar {
-    flex: 1;
-    height: 6px;
-    cursor: pointer;
-  }
-
   .time {
     font-size: 12px;
     color: var(--text-muted);
@@ -107,13 +85,6 @@
     min-width: 160px;
     text-align: right;
     white-space: nowrap;
-  }
-
-  .frame-display {
-    font-size: 11px;
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-    min-width: 50px;
   }
 
   .speed-label {

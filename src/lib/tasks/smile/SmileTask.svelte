@@ -3,10 +3,11 @@
   import FragmentList from "../../components/FragmentList.svelte";
   import SmileToolbar from "./SmileToolbar.svelte";
   import SmileControls from "./SmileControls.svelte";
-  import EventList from "./EventList.svelte";
+  import SmileTimeline from "./SmileTimeline.svelte";
+  import type { SmileTimelineMenuItem } from "./SmileTimeline.svelte";
   import Legend from "./Legend.svelte";
   import type { SmileEvent, SmileFragment, ExpressionType, Intensity } from "./types";
-  import { KEY_TO_EXPRESSION } from "./types";
+  import { KEY_TO_EXPRESSION, INTENSITY_LABELS } from "./types";
   import { toCSV, fromCSV, type SmileCSVMetadata } from "./csv";
   import { pickAndLoadVideo, getFileName } from "../../utils/video";
   import { open, save } from "@tauri-apps/plugin-dialog";
@@ -326,6 +327,17 @@
     nextEventId = 0;
   }
 
+  function setEventIntensity(id: number, intensity: Intensity) {
+    events = events.map((e) => e.id === id ? { ...e, intensity } : e);
+  }
+
+  const timelineMenuItems: SmileTimelineMenuItem[] = [
+    { label: "Intensity: Weak (1)", action: (id) => setEventIntensity(id, 1) },
+    { label: "Intensity: Moderate (2)", action: (id) => setEventIntensity(id, 2) },
+    { label: "Intensity: Strong (3)", action: (id) => setEventIntensity(id, 3) },
+    { label: "Delete", action: removeEvent },
+  ];
+
   // Keyboard recording
   function onKeydown(e: KeyboardEvent) {
     if (!active) return;
@@ -455,12 +467,6 @@
       {/if}
     </div>
 
-    <EventList
-      {events}
-      onRemove={removeEvent}
-      onClear={clearEvents}
-      onExportCSV={exportCSV}
-    />
   </div>
 
   <SmileControls
@@ -468,10 +474,21 @@
     bind:playbackSpeed
     {currentTime}
     {duration}
+    fragmentEndTime={activeFragment?.endTime ?? null}
+    onTogglePlay={() => videoPlayer?.togglePlay()}
+  />
+
+  <SmileTimeline
+    {events}
+    {currentTime}
+    {duration}
+    {detectedFps}
     fragmentStartTime={activeFragment?.startTime ?? null}
     fragmentEndTime={activeFragment?.endTime ?? null}
+    recordingStartTime={activeRecording?.startTime ?? null}
+    recordingType={activeRecording?.type ?? null}
+    menuItems={timelineMenuItems}
     onSeek={(t) => videoPlayer?.seek(t)}
-    onTogglePlay={() => videoPlayer?.togglePlay()}
   />
 
   <Legend
