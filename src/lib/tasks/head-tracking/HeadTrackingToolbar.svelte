@@ -129,8 +129,8 @@
             <input
                 type="range"
                 class="size-slider"
-                min="10"
-                max="120"
+                min="20"
+                max="500"
                 step="1"
                 bind:value={shapeSizes[target].circleRadius}
             />
@@ -141,8 +141,8 @@
             <input
                 type="range"
                 class="size-slider"
-                min="10"
-                max="120"
+                min="20"
+                max="500"
                 step="1"
                 bind:value={shapeSizes[target].ellipseA}
             />
@@ -153,8 +153,8 @@
             <input
                 type="range"
                 class="size-slider"
-                min="10"
-                max="120"
+                min="20"
+                max="500"
                 step="1"
                 bind:value={shapeSizes[target].ellipseB}
             />

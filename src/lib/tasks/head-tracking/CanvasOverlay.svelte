@@ -40,6 +40,9 @@
 
   let canvasEl = $state<HTMLCanvasElement | null>(null);
 
+  // Scale factor: maps video-pixel sizes to display-pixel sizes
+  let scale = $derived(videoWidth > 0 ? width / videoWidth : 1);
+
   let isDragging = $state(false);
   let dragX = $state(0.5);
   let dragY = $state(0.5);
@@ -171,12 +174,13 @@
 
     const pixel = toPixel(pos.x, pos.y);
     const sizes = shapeSizes[t];
+    const s = scale;
     const color = active ? TARGET_COLORS[t] : INACTIVE_COLOR;
     const isOrientationPhase = active && activePhase === "orientation";
 
     if (isOrientationPhase) {
-      const a = sizes.ellipseA;
-      const b = sizes.ellipseB;
+      const a = sizes.ellipseA * s;
+      const b = sizes.ellipseB * s;
       const yaw = active ? dYaw : (getYawAt(rows, t, frame) ?? 0);
       const rotRad = ((yaw + 90) * Math.PI) / 180;
 
@@ -198,7 +202,7 @@
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.arc(handle.x, handle.y, 6, 0, Math.PI * 2);
+      ctx.arc(handle.x, handle.y, Math.max(3, 6 * s), 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.fill();
       ctx.strokeStyle = "#fff";
@@ -206,11 +210,11 @@
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.arc(pixel.x, pixel.y, 3, 0, Math.PI * 2);
+      ctx.arc(pixel.x, pixel.y, Math.max(2, 3 * s), 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.fill();
     } else {
-      const r = sizes.circleRadius;
+      const r = sizes.circleRadius * s;
 
       ctx.beginPath();
       ctx.arc(pixel.x, pixel.y, r, 0, Math.PI * 2);
@@ -220,11 +224,12 @@
       ctx.fillStyle = color + "20";
       ctx.fill();
 
+      const cross = Math.max(3, 5 * s);
       ctx.beginPath();
-      ctx.moveTo(pixel.x - 5, pixel.y);
-      ctx.lineTo(pixel.x + 5, pixel.y);
-      ctx.moveTo(pixel.x, pixel.y - 5);
-      ctx.lineTo(pixel.x, pixel.y + 5);
+      ctx.moveTo(pixel.x - cross, pixel.y);
+      ctx.lineTo(pixel.x + cross, pixel.y);
+      ctx.moveTo(pixel.x, pixel.y - cross);
+      ctx.lineTo(pixel.x, pixel.y + cross);
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
       ctx.stroke();
@@ -278,11 +283,12 @@
       ctx.stroke();
     }
 
+    const dotR = Math.max(2, 3 * scale);
     for (let i = 0; i < points.length; i++) {
       const progress = i / points.length;
       const alpha = 0.5 - progress * 0.4;
       ctx.beginPath();
-      ctx.arc(points[i].x, points[i].y, 3, 0, Math.PI * 2);
+      ctx.arc(points[i].x, points[i].y, dotR, 0, Math.PI * 2);
       ctx.fillStyle = color + Math.round(alpha * 255).toString(16).padStart(2, "0");
       ctx.fill();
     }
@@ -298,16 +304,17 @@
     const coords = getCanvasCoords(e);
     const pixel = toPixel(dragX, dragY);
     const sizes = shapeSizes[target];
+    const s = scale;
 
     if (phase === "position") {
-      const r = sizes.circleRadius;
-      if (dist(coords.x, coords.y, pixel.x, pixel.y) <= r + 10) {
+      const r = sizes.circleRadius * s;
+      if (dist(coords.x, coords.y, pixel.x, pixel.y) <= r + 10 * s) {
         isDragging = true;
       }
     } else {
-      const a = sizes.ellipseA;
+      const a = sizes.ellipseA * s;
       const handle = handlePoint(pixel.x, pixel.y, a, dragYaw);
-      if (dist(coords.x, coords.y, handle.x, handle.y) <= 12) {
+      if (dist(coords.x, coords.y, handle.x, handle.y) <= Math.max(8, 12 * s)) {
         isDragging = true;
       }
     }

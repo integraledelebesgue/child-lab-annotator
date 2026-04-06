@@ -25,8 +25,8 @@ export interface ShapeSizes {
 }
 
 export const DEFAULT_SHAPE_SIZES: ShapeSizes = {
-  infant: { circleRadius: 25, ellipseA: 29, ellipseB: 22 },
-  mother: { circleRadius: 35, ellipseA: 40, ellipseB: 31 },
+  infant: { circleRadius: 120, ellipseA: 140, ellipseB: 105 },
+  mother: { circleRadius: 170, ellipseA: 190, ellipseB: 150 },
 };
 
 export interface HeadTrackingFragment extends Fragment {
