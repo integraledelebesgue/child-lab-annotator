@@ -4,6 +4,7 @@
   import GazeToolbar from "./GazeToolbar.svelte";
   import GazeControls from "./GazeControls.svelte";
   import GazeTimeline from "./GazeTimeline.svelte";
+  import GazeLegend from "./GazeLegend.svelte";
   import type { GazeEvent, GazeFragment, VideoRole, GazePhase, HelperData } from "./types";
   import { VIDEO_ROLES, VIDEO_ROLE_LABELS } from "./types";
   import { toCSV, fromCSV, parseHelperCSV, type GazeCSVMetadata } from "./csv";
@@ -509,9 +510,12 @@
       return;
     }
 
-    if ((e.key === "Delete" || e.key === "Backspace") && !isRecording) {
-      if (events.length > 0) {
-        events = events.slice(0, -1);
+    if (e.key.toLowerCase() === "e" && phase === "annotation") {
+      e.preventDefault();
+      if (isRecording) {
+        markEnd();
+      } else if (!isOnEvent) {
+        markStart();
       }
       return;
     }
@@ -665,6 +669,8 @@
     menuItems={timelineMenuItems}
     onSeek={seekAll}
   />
+
+  <GazeLegend {phase} {isRecording} />
 
   {#if toast}
     <div class="toast">{toast}</div>
