@@ -327,7 +327,7 @@
   {#if contextMenu}
     <div
       class="event-menu"
-      style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
+      style="left: {contextMenu.x}px; bottom: {window.innerHeight - contextMenu.y}px;"
     >
       {#each menuItems as item}
         <button
