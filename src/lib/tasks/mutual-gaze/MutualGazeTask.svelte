@@ -70,6 +70,11 @@
   let effectiveMotherOffset = $derived(motherOffset - ceilingOffset);
   let effectiveInfantOffset = $derived(infantOffset - ceilingOffset);
 
+  // Tracks the ceiling offset as seen by the last offset-effect run,
+  // so the reference point can be derived from currentTime correctly
+  // even after playback has advanced the position.
+  let prevCeilingOffset = 0;
+
   // Helper data
   let helperData = $state<HelperData | null>(null);
   let threshold = $state(30);
@@ -176,17 +181,21 @@
     });
   });
 
-  // Seek videos in real-time when offsets change during sync phase
+  // Seek videos in real-time when offsets change during sync phase.
+  // Derives the reference point from currentTime (ceiling's actual position)
+  // using prevCeilingOffset, so it works correctly even after playback.
+  // Only the video whose slider changed actually moves.
   $effect(() => {
     motherOffset;
     ceilingOffset;
     infantOffset;
     untrack(() => {
       if (phase !== "synchronization") return;
-      const base = activeFragment?.startTime ?? 0;
-      ceilingPlayer?.seek(base + ceilingOffset);
-      motherPlayer?.seek(base + motherOffset);
-      infantPlayer?.seek(base + infantOffset);
+      const ref = currentTime - prevCeilingOffset;
+      ceilingPlayer?.seek(ref + ceilingOffset);
+      motherPlayer?.seek(ref + motherOffset);
+      infantPlayer?.seek(ref + infantOffset);
+      prevCeilingOffset = ceilingOffset;
     });
   });
 
