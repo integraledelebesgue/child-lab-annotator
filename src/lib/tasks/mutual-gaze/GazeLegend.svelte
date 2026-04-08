@@ -23,7 +23,7 @@
       <div class="legend-items">
         <span class="legend-item">
           <kbd class:recording={isRecording}>E</kbd>
-          {isRecording ? "End event" : "Start event"}
+          Hold to record
         </span>
       </div>
     </div>

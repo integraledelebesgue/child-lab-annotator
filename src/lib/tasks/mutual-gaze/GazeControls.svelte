@@ -1,6 +1,4 @@
 <script lang="ts">
-  import type { GazePhase } from "./types";
-
   interface Props {
     isPlaying: boolean;
     playbackSpeed: number;
@@ -8,11 +6,7 @@
     duration: number;
     fragmentEndTime: number | null;
     isRecording: boolean;
-    canStartRecording: boolean;
-    phase: GazePhase;
     onTogglePlay: () => void;
-    onMarkStart: () => void;
-    onMarkEnd: () => void;
   }
 
   let {
@@ -22,11 +16,7 @@
     duration,
     fragmentEndTime,
     isRecording,
-    canStartRecording,
-    phase,
     onTogglePlay,
-    onMarkStart,
-    onMarkEnd,
   }: Props = $props();
 
   let displayDuration = $derived(fragmentEndTime ?? duration);
@@ -44,26 +34,6 @@
     <button class="control-btn" onclick={onTogglePlay} title="Space">
       {isPlaying ? "⏸ PAUSE" : "▶ PLAY"}
     </button>
-
-    {#if phase === "annotation"}
-      <button
-        class="control-btn mark-btn"
-        class:active={canStartRecording}
-        onclick={onMarkStart}
-        disabled={!canStartRecording}
-      >
-        Mark Start
-      </button>
-
-      <button
-        class="control-btn mark-btn end"
-        class:active={isRecording}
-        onclick={onMarkEnd}
-        disabled={!isRecording}
-      >
-        Mark End
-      </button>
-    {/if}
 
     <span class="time">{formatTime(currentTime)} / {formatTime(displayDuration)}</span>
   </div>
@@ -111,25 +81,6 @@
     min-width: 90px;
     height: 32px;
     text-align: center;
-  }
-
-  .mark-btn {
-    min-width: 100px;
-  }
-
-  .mark-btn.active {
-    border-color: var(--accent-active);
-    color: var(--accent-active);
-  }
-
-  .mark-btn.end.active {
-    border-color: #ef4444;
-    color: #ef4444;
-  }
-
-  .mark-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
   }
 
   .time {

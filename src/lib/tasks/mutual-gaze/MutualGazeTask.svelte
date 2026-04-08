@@ -88,12 +88,10 @@
   let activeRecording = $state<{
     startTime: number;
     startFrame: number;
+    wasPlaying: boolean;
   } | null>(null);
 
   let isRecording = $derived(activeRecording !== null);
-  let isOnEvent = $derived(
-    events.some((e) => currentTime >= e.startTime && currentTime <= e.endTime)
-  );
 
   let hasAllVideos = $derived(
     videoSrcs.mother !== null &&
@@ -470,10 +468,17 @@
 
   function markStart() {
     if (isRecording) return;
+    const wasPlaying = isPlaying;
     activeRecording = {
       startTime: currentTime,
       startFrame: currentFrame,
+      wasPlaying,
     };
+    if (!wasPlaying) {
+      togglePlayAll();
+      activeRecording.startTime = currentTime;
+      activeRecording.startFrame = currentFrame;
+    }
   }
 
   function markEnd() {
@@ -485,8 +490,12 @@
       startFrame: activeRecording.startFrame,
       endFrame: currentFrame,
     };
+    const wasPlaying = activeRecording.wasPlaying;
     events = [...events, newEvent];
     activeRecording = null;
+    if (!wasPlaying) {
+      togglePlayAll();
+    }
   }
 
   function deleteEvent(id: number) {
@@ -502,27 +511,35 @@
   function onKeydown(e: KeyboardEvent) {
     if (!active) return;
     if (e.repeat) return;
+
+    // E key starts recording (works regardless of focus)
+    if (e.key.toLowerCase() === "e" && phase === "annotation" && !activeRecording) {
+      e.preventDefault();
+      markStart();
+      return;
+    }
+
+    // Space only fires when focus is on document body
     if (e.target !== document.body) return;
 
-    if (e.code === "Space") {
+    if (e.code === "Space" && !activeRecording) {
       e.preventDefault();
       togglePlayAll();
       return;
     }
+  }
 
-    if (e.key.toLowerCase() === "e" && phase === "annotation") {
-      e.preventDefault();
-      if (isRecording) {
-        markEnd();
-      } else if (!isOnEvent) {
-        markStart();
-      }
-      return;
+  function onKeyup(e: KeyboardEvent) {
+    if (!active) return;
+    if (!activeRecording) return;
+
+    if (e.key.toLowerCase() === "e") {
+      markEnd();
     }
   }
 </script>
 
-<svelte:window onkeydown={onKeydown} />
+<svelte:window onkeydown={onKeydown} onkeyup={onKeyup} />
 
 <div class="task">
   <GazeToolbar
@@ -649,11 +666,7 @@
     {duration}
     fragmentEndTime={activeFragment?.endTime ?? null}
     {isRecording}
-    canStartRecording={!isRecording && !isOnEvent}
-    {phase}
     onTogglePlay={togglePlayAll}
-    onMarkStart={markStart}
-    onMarkEnd={markEnd}
   />
 
   <GazeTimeline
