@@ -26,6 +26,7 @@
     onVideoError: (msg: string) => void;
     onFrame?: (frame: number, mediaTime: number) => void;
     overlay?: Snippet<[OverlayParams]>;
+    muted?: boolean;
   }
 
   let {
@@ -44,6 +45,7 @@
     onVideoError,
     onFrame,
     overlay,
+    muted = false,
   }: Props = $props();
 
   let videoEl = $state<HTMLVideoElement | null>(null);
@@ -261,6 +263,7 @@
     <video
       bind:this={videoEl}
       src={src}
+      {muted}
       onloadedmetadata={onLoadedMetadata}
       ontimeupdate={onTimeUpdate}
       onplay={onPlay}

@@ -582,7 +582,7 @@
     <div class="video-area">
       <div class="video-grid">
         {#each VIDEO_ROLES as role}
-          <div class="video-cell">
+          <div class="video-cell" class:hidden={phase === "annotation" && role === "ceiling"}>
             <div class="video-label">{VIDEO_ROLE_LABELS[role]}</div>
             <div class="video-player-container">
               {#if role === "ceiling"}
@@ -590,6 +590,7 @@
                   bind:this={ceilingPlayer}
                   src={videoSrcs.ceiling}
                   {playbackSpeed}
+                  muted={phase === "annotation"}
                   bind:isPlaying
                   bind:currentTime
                   bind:duration
@@ -734,6 +735,10 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
+  }
+
+  .video-cell.hidden {
+    display: none;
   }
 
   .video-label {
