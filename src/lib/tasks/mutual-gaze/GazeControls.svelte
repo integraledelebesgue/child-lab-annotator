@@ -5,7 +5,7 @@
     currentTime: number;
     duration: number;
     fragmentEndTime: number | null;
-    isRecording: boolean;
+    recordingLabel: string | null;
     onTogglePlay: () => void;
   }
 
@@ -15,7 +15,7 @@
     currentTime,
     duration,
     fragmentEndTime,
-    isRecording,
+    recordingLabel,
     onTogglePlay,
   }: Props = $props();
 
@@ -49,8 +49,8 @@
       step="0.05"
       bind:value={playbackSpeed}
     />
-    {#if isRecording}
-      <span class="recording-indicator">Recording...</span>
+    {#if recordingLabel}
+      <span class="recording-indicator">Recording {recordingLabel}...</span>
     {/if}
   </div>
 </div>

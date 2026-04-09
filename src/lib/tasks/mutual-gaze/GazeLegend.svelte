@@ -36,12 +36,7 @@
     {/each}
   {/if}
 
-  {#if isRecording && recordingType}
-    <div class="recording-indicator">
-      <span class="rec-dot" style="background: {GAZE_EVENT_COLORS[recordingType]}"></span>
-      Recording {GAZE_EVENT_LABELS[recordingType]}...
-    </div>
-  {/if}
+
 </div>
 
 <style>
@@ -107,23 +102,6 @@
     color: #ef4444;
     border-color: #ef4444;
     background: rgba(239, 68, 68, 0.15);
-    animation: pulse 1s infinite;
-  }
-
-  .recording-indicator {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: auto;
-    font-size: 12px;
-    color: var(--text);
-    font-weight: 500;
-  }
-
-  .rec-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
     animation: pulse 1s infinite;
   }
 

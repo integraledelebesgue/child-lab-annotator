@@ -5,6 +5,7 @@
     currentTime: number;
     duration: number;
     fragmentEndTime: number | null;
+    recordingLabel: string | null;
     onTogglePlay: () => void;
   }
 
@@ -14,6 +15,7 @@
     currentTime,
     duration,
     fragmentEndTime,
+    recordingLabel,
     onTogglePlay,
   }: Props = $props();
 
@@ -47,6 +49,9 @@
       step="0.05"
       bind:value={playbackSpeed}
     />
+    {#if recordingLabel}
+      <span class="recording-indicator">Recording {recordingLabel}...</span>
+    {/if}
   </div>
 </div>
 
@@ -101,5 +106,17 @@
 
   .speed-slider {
     width: 180px;
+  }
+
+  .recording-indicator {
+    font-size: 12px;
+    color: #ef4444;
+    margin-left: 12px;
+    animation: blink 1s infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
   }
 </style>

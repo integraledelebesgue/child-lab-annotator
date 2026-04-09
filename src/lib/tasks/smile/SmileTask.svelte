@@ -7,7 +7,7 @@
   import type { SmileTimelineMenuItem } from "./SmileTimeline.svelte";
   import Legend from "./Legend.svelte";
   import type { SmileEvent, SmileFragment, ExpressionType, Intensity } from "./types";
-  import { KEY_TO_EXPRESSION, INTENSITY_LABELS } from "./types";
+  import { KEY_TO_EXPRESSION, INTENSITY_LABELS, EXPRESSION_LABELS } from "./types";
   import { toCSV, fromCSV, type SmileCSVMetadata } from "./csv";
   import { pickAndLoadVideo, getFileName } from "../../utils/video";
   import { open, save } from "@tauri-apps/plugin-dialog";
@@ -475,6 +475,7 @@
     {currentTime}
     {duration}
     fragmentEndTime={activeFragment?.endTime ?? null}
+    recordingLabel={activeRecording ? EXPRESSION_LABELS[activeRecording.type] : null}
     onTogglePlay={() => videoPlayer?.togglePlay()}
   />
 

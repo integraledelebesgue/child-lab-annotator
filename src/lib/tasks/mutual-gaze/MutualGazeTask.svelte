@@ -6,7 +6,7 @@
   import GazeTimeline from "./GazeTimeline.svelte";
   import GazeLegend from "./GazeLegend.svelte";
   import type { GazeEvent, GazeEventType, GazeFragment, VideoRole, GazePhase, HelperData } from "./types";
-  import { VIDEO_ROLES, VIDEO_ROLE_LABELS, KEY_TO_GAZE_EVENT } from "./types";
+  import { VIDEO_ROLES, VIDEO_ROLE_LABELS, KEY_TO_GAZE_EVENT, GAZE_EVENT_LABELS } from "./types";
   import { toCSV, fromCSV, parseHelperCSV, type GazeCSVMetadata } from "./csv";
   import { pickAndLoadVideo } from "../../utils/video";
   import { open, save } from "@tauri-apps/plugin-dialog";
@@ -682,7 +682,7 @@
     {currentTime}
     {duration}
     fragmentEndTime={activeFragment?.endTime ?? null}
-    {isRecording}
+    recordingLabel={activeRecording ? GAZE_EVENT_LABELS[activeRecording.type] : null}
     onTogglePlay={togglePlayAll}
   />
 
