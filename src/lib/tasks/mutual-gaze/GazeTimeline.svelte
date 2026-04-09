@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { GazeEvent, HelperData } from "./types";
+  import type { GazeEvent, GazeEventType, HelperData } from "./types";
+  import { GAZE_EVENT_COLORS } from "./types";
 
   export interface TimelineMenuItem {
     label: string;
@@ -16,6 +17,7 @@
     fragmentStartTime: number | null;
     fragmentEndTime: number | null;
     recordingStartTime: number | null;
+    recordingType: GazeEventType | null;
     menuItems: TimelineMenuItem[];
     onSeek: (time: number) => void;
   }
@@ -30,6 +32,7 @@
     fragmentStartTime,
     fragmentEndTime,
     recordingStartTime,
+    recordingType,
     menuItems,
     onSeek,
   }: Props = $props();
@@ -37,6 +40,11 @@
   const CANVAS_HEIGHT = 64;
   const EVENT_HEIGHT = 16;
   const EVENT_MARGIN = 4;
+
+  function hexToRgb(hex: string): [number, number, number] {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
 
   let containerEl = $state<HTMLDivElement | null>(null);
   let canvasEl = $state<HTMLCanvasElement | null>(null);
@@ -103,6 +111,7 @@
     const _rangeEnd = rangeEnd;
     const _rangeDuration = rangeDuration;
     const _recordingStart = recordingStartTime;
+    const _recordingType = recordingType;
     const _hoveredId = hoveredEventId;
 
     const dpr = window.devicePixelRatio || 1;
@@ -158,24 +167,25 @@
     // Set scale for all subsequent drawing (ruler, events, playhead)
     ctx.scale(dpr, dpr);
 
-    // Layer 2: Event bars — centered on ruler line
+    // Layer 2: Event bars — centered on ruler line, colored by type
     const eventY = midY - EVENT_HEIGHT / 2;
     for (const event of _events) {
       const x1 = timeToX(event.startTime);
       const x2 = timeToX(event.endTime);
       const barWidth = Math.max(x2 - x1, 2);
-      ctx.fillStyle = event.id === _hoveredId
-        ? "rgba(245, 158, 11, 0.8)"
-        : "rgba(245, 158, 11, 0.45)";
+      const [r, g, b] = hexToRgb(GAZE_EVENT_COLORS[event.type]);
+      const alpha = event.id === _hoveredId ? 0.8 : 0.45;
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
       ctx.fillRect(x1, eventY, barWidth, EVENT_HEIGHT);
     }
 
     // Active recording bar
-    if (_recordingStart !== null) {
+    if (_recordingStart !== null && _recordingType !== null) {
       const x1 = timeToX(_recordingStart);
       const x2 = timeToX(_currentTime);
       const barWidth = Math.max(x2 - x1, 2);
-      ctx.fillStyle = "rgba(245, 158, 11, 0.7)";
+      const [r, g, b] = hexToRgb(GAZE_EVENT_COLORS[_recordingType]);
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.7)`;
       ctx.fillRect(x1, eventY, barWidth, EVENT_HEIGHT);
     }
 

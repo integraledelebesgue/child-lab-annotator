@@ -5,8 +5,8 @@
   import GazeControls from "./GazeControls.svelte";
   import GazeTimeline from "./GazeTimeline.svelte";
   import GazeLegend from "./GazeLegend.svelte";
-  import type { GazeEvent, GazeFragment, VideoRole, GazePhase, HelperData } from "./types";
-  import { VIDEO_ROLES, VIDEO_ROLE_LABELS } from "./types";
+  import type { GazeEvent, GazeEventType, GazeFragment, VideoRole, GazePhase, HelperData } from "./types";
+  import { VIDEO_ROLES, VIDEO_ROLE_LABELS, KEY_TO_GAZE_EVENT } from "./types";
   import { toCSV, fromCSV, parseHelperCSV, type GazeCSVMetadata } from "./csv";
   import { pickAndLoadVideo } from "../../utils/video";
   import { open, save } from "@tauri-apps/plugin-dialog";
@@ -91,6 +91,8 @@
 
   // Recording state
   let activeRecording = $state<{
+    key: string;
+    type: GazeEventType;
     startTime: number;
     startFrame: number;
     wasPlaying: boolean;
@@ -475,10 +477,12 @@
     phase = p;
   }
 
-  function markStart() {
+  function markStart(key: string, type: GazeEventType) {
     if (isRecording) return;
     const wasPlaying = isPlaying;
     activeRecording = {
+      key,
+      type,
       startTime: currentTime,
       startFrame: currentFrame,
       wasPlaying,
@@ -494,6 +498,7 @@
     if (!activeRecording) return;
     const newEvent: GazeEvent = {
       id: nextEventId++,
+      type: activeRecording.type,
       startTime: activeRecording.startTime,
       endTime: currentTime,
       startFrame: activeRecording.startFrame,
@@ -521,10 +526,12 @@
     if (!active) return;
     if (e.repeat) return;
 
-    // E key starts recording (works regardless of focus)
-    if (e.key.toLowerCase() === "e" && phase === "annotation" && !activeRecording) {
+    const key = e.key.toLowerCase();
+
+    // E/W keys start recording (works regardless of focus)
+    if (KEY_TO_GAZE_EVENT[key] && phase === "annotation" && !activeRecording) {
       e.preventDefault();
-      markStart();
+      markStart(key, KEY_TO_GAZE_EVENT[key]);
       return;
     }
 
@@ -542,7 +549,7 @@
     if (!active) return;
     if (!activeRecording) return;
 
-    if (e.key.toLowerCase() === "e") {
+    if (e.key.toLowerCase() === activeRecording.key) {
       markEnd();
     }
   }
@@ -689,11 +696,12 @@
     fragmentStartTime={activeFragment?.startTime ?? null}
     fragmentEndTime={activeFragment?.endTime ?? null}
     recordingStartTime={activeRecording?.startTime ?? null}
+    recordingType={activeRecording?.type ?? null}
     menuItems={timelineMenuItems}
     onSeek={seekAll}
   />
 
-  <GazeLegend {phase} {isRecording} />
+  <GazeLegend {phase} {isRecording} recordingType={activeRecording?.type ?? null} />
 
   {#if toast}
     <div class="toast">{toast}</div>

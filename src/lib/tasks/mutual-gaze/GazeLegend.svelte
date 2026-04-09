@@ -1,12 +1,16 @@
 <script lang="ts">
-  import type { GazePhase } from "./types";
+  import type { GazePhase, GazeEventType } from "./types";
+  import { GAZE_EVENT_LABELS, GAZE_EVENT_COLORS, GAZE_EVENT_KEYS } from "./types";
 
   interface Props {
     phase: GazePhase;
     isRecording: boolean;
+    recordingType: GazeEventType | null;
   }
 
-  let { phase, isRecording }: Props = $props();
+  let { phase, isRecording, recordingType }: Props = $props();
+
+  const eventTypes: GazeEventType[] = ["uncertain_mutual_gaze", "mutual_gaze"];
 </script>
 
 <div class="legend">
@@ -18,21 +22,24 @@
   </div>
 
   {#if phase === "annotation"}
-    <div class="legend-section">
-      <span class="legend-title">Mutual Gaze Event</span>
-      <div class="legend-items">
-        <span class="legend-item">
-          <kbd class:recording={isRecording}>E</kbd>
-          Hold to record
-        </span>
+    {#each eventTypes as type}
+      <div class="legend-section">
+        <span class="legend-title">{GAZE_EVENT_LABELS[type]}</span>
+        <div class="legend-items">
+          <span class="legend-item">
+            <span class="color-dot" style="background: {GAZE_EVENT_COLORS[type]}"></span>
+            <kbd class:recording={isRecording && recordingType === type}>{GAZE_EVENT_KEYS[type]}</kbd>
+            Hold to record
+          </span>
+        </div>
       </div>
-    </div>
+    {/each}
   {/if}
 
-  {#if isRecording}
+  {#if isRecording && recordingType}
     <div class="recording-indicator">
-      <span class="rec-dot"></span>
-      Recording...
+      <span class="rec-dot" style="background: {GAZE_EVENT_COLORS[recordingType]}"></span>
+      Recording {GAZE_EVENT_LABELS[recordingType]}...
     </div>
   {/if}
 </div>
@@ -89,6 +96,13 @@
     color: var(--text-muted);
   }
 
+  .color-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
   kbd.recording {
     color: #ef4444;
     border-color: #ef4444;
@@ -102,7 +116,7 @@
     gap: 6px;
     margin-left: auto;
     font-size: 12px;
-    color: #ef4444;
+    color: var(--text);
     font-weight: 500;
   }
 
@@ -110,7 +124,6 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #ef4444;
     animation: pulse 1s infinite;
   }
 

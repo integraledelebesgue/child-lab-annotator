@@ -1,7 +1,7 @@
-import type { GazeEvent, HelperData } from "./types";
+import type { GazeEvent, GazeEventType, HelperData } from "./types";
 import { parseMetadataComments, columnMap } from "../../utils/csv";
 
-const HEADER = "start_time,end_time,duration,start_frame,end_frame";
+const HEADER = "type,start_time,end_time,duration,start_frame,end_frame";
 
 export interface GazeCSVMetadata {
   playbackSpeed: number;
@@ -22,6 +22,7 @@ export function toCSV(events: GazeEvent[], metadata: GazeCSVMetadata): string {
     const duration = event.endTime - event.startTime;
     lines.push(
       [
+        event.type,
         event.startTime.toFixed(4),
         event.endTime.toFixed(4),
         duration.toFixed(4),
@@ -63,13 +64,23 @@ export function fromCSV(text: string): GazeCSVResult {
     throw new Error("Invalid CSV: missing 'start_time' column in header");
   }
 
+  const VALID_TYPES = new Set<GazeEventType>(["mutual_gaze", "uncertain_mutual_gaze"]);
+  const hasTypeCol = col.type !== undefined;
+
   const events: GazeEvent[] = [];
   let nextId = 0;
   for (let i = dataStart + 1; i < lines.length; i++) {
     const parts = lines[i].split(",");
 
+    let type: GazeEventType = "mutual_gaze";
+    if (hasTypeCol) {
+      const raw = (parts[col.type] ?? "").trim();
+      if (VALID_TYPES.has(raw as GazeEventType)) type = raw as GazeEventType;
+    }
+
     events.push({
       id: nextId++,
+      type,
       startTime: parseFloat(parts[col.start_time] ?? "") || 0,
       endTime: parseFloat(parts[col.end_time] ?? "") || 0,
       startFrame: parseInt(parts[col.start_frame] ?? "", 10) || 0,
