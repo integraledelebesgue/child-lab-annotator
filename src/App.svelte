@@ -15,12 +15,37 @@
 
   let activeTab = $state("head-tracking");
 
-  onMount(async () => {
-    const status = await getDebugLogStatus();
-    logDebugEvent("frontend", "app-mounted", {
-      debugLogEnabled: status.enabled,
-      debugLogPath: status.path,
+  onMount(() => {
+    const onWindowError = (event: ErrorEvent) => {
+      logDebugEvent("frontend", "window-error", {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        error: event.error instanceof Error ? event.error.stack ?? event.error.message : String(event.error),
+      });
+    };
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      logDebugEvent("frontend", "unhandled-rejection", {
+        reason: reason instanceof Error ? reason.stack ?? reason.message : String(reason),
+      });
+    };
+
+    window.addEventListener("error", onWindowError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+
+    void getDebugLogStatus().then((status) => {
+      logDebugEvent("frontend", "app-mounted", {
+        debugLogEnabled: status.enabled,
+        debugLogPath: status.path,
+      });
     });
+
+    return () => {
+      window.removeEventListener("error", onWindowError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    };
   });
 </script>
 

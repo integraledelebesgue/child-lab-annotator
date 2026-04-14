@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { GazeEvent, GazeEventType, HelperData } from "./types";
   import { GAZE_EVENT_COLORS } from "./types";
+  import { logDebugEvent } from "../../utils/debugLog";
 
   export interface TimelineMenuItem {
     label: string;
@@ -49,6 +50,7 @@
   let containerEl = $state<HTMLDivElement | null>(null);
   let canvasEl = $state<HTMLCanvasElement | null>(null);
   let canvasWidth = $state(0);
+  let lastLayoutLogKey = "";
 
   let rangeStart = $derived(fragmentStartTime ?? 0);
   let rangeEnd = $derived(fragmentEndTime ?? duration);
@@ -64,18 +66,44 @@
     return rangeStart + (x / canvasWidth) * rangeDuration;
   }
 
+  function setCanvasWidth(width: number): number {
+    const nextWidth = Math.round(width);
+    if (nextWidth > 0 && nextWidth !== canvasWidth) canvasWidth = nextWidth;
+    return nextWidth;
+  }
+
+  function measureCanvasWidth(): number {
+    return setCanvasWidth(containerEl?.clientWidth ?? 0);
+  }
+
+  function logTimelineLayout(message: string, details: Record<string, unknown>) {
+    const key = `${message}:${JSON.stringify(details)}`;
+    if (key === lastLayoutLogKey) return;
+    lastLayoutLogKey = key;
+    logDebugEvent("mutual-gaze:timeline", message, details);
+  }
+
   // ResizeObserver
   let resizeObserver: ResizeObserver | null = null;
 
   $effect(() => {
     if (containerEl) {
+      measureCanvasWidth();
+      requestAnimationFrame(measureCanvasWidth);
       resizeObserver = new ResizeObserver((entries) => {
         const w = entries[0]?.contentRect.width ?? 0;
-        if (w > 0) canvasWidth = w;
+        setCanvasWidth(w);
       });
       resizeObserver.observe(containerEl);
       return () => resizeObserver?.disconnect();
     }
+  });
+
+  $effect(() => {
+    void duration;
+    void fragmentStartTime;
+    void fragmentEndTime;
+    requestAnimationFrame(measureCanvasWidth);
   });
 
   // Choose tick interval based on pixels-per-second
@@ -99,7 +127,17 @@
   // Draw
   $effect(() => {
     const canvas = canvasEl;
-    if (!canvas || canvasWidth <= 0 || rangeDuration <= 0) return;
+    if (!canvas || canvasWidth <= 0 || rangeDuration <= 0) {
+      logTimelineLayout("draw-skipped", {
+        hasCanvas: canvas !== null,
+        canvasWidth,
+        rangeDuration,
+        duration,
+        fragmentStartTime,
+        fragmentEndTime,
+      });
+      return;
+    }
 
     // Read all reactive deps
     const _helperData = helperData;
@@ -236,6 +274,16 @@
     ctx.moveTo(playX, 0);
     ctx.lineTo(playX, h);
     ctx.stroke();
+
+    logTimelineLayout("drawn", {
+      canvasWidth: w,
+      rangeStart: _rangeStart,
+      rangeEnd: _rangeEnd,
+      rangeDuration: _rangeDuration,
+      duration,
+      eventCount: _events.length,
+      hasHelperData: _helperData !== null,
+    });
   });
 
   // Hover state
@@ -363,6 +411,8 @@
 
   canvas {
     display: block;
+    width: 100%;
+    height: 64px;
   }
 
   .menu-backdrop {

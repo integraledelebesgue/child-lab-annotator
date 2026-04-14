@@ -12,7 +12,7 @@
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { invoke } from "@tauri-apps/api/core";
   import { getVersion } from "@tauri-apps/api/app";
-  import { untrack } from "svelte";
+  import { tick, untrack } from "svelte";
   import { logDebugEvent } from "../../utils/debugLog";
 
   interface Props {
@@ -72,7 +72,28 @@
   let effectiveInfantOffset = $derived(infantOffset - ceilingOffset);
 
   let primaryRole: VideoRole | null = $derived(
-    videoSrcs.ceiling ? "ceiling" : videoSrcs.mother ? "mother" : videoSrcs.infant ? "infant" : null
+    videoSrcs.ceiling && duration > 0
+      ? "ceiling"
+      : videoSrcs.mother && motherDuration > 0
+        ? "mother"
+        : videoSrcs.infant && infantDuration > 0
+          ? "infant"
+          : videoSrcs.ceiling
+            ? "ceiling"
+            : videoSrcs.mother
+              ? "mother"
+              : videoSrcs.infant
+                ? "infant"
+                : null
+  );
+  let loadedPrimaryRole: VideoRole | null = $derived(
+    videoSrcs.ceiling && duration > 0
+      ? "ceiling"
+      : videoSrcs.mother && motherDuration > 0
+        ? "mother"
+        : videoSrcs.infant && infantDuration > 0
+          ? "infant"
+          : null
   );
   let primaryIsPlaying = $derived(
     primaryRole === "mother" ? motherPlaying : primaryRole === "infant" ? infantPlaying : isPlaying
@@ -90,6 +111,22 @@
     primaryRole === "mother" ? motherFps : primaryRole === "infant" ? infantFps : detectedFps
   );
   let offsetStep = $derived(1 / Math.max(primaryDetectedFps, 1));
+  let timelineRole: VideoRole | null = $derived(loadedPrimaryRole ?? primaryRole);
+  let timelineIsPlaying = $derived(
+    timelineRole === "mother" ? motherPlaying : timelineRole === "infant" ? infantPlaying : isPlaying
+  );
+  let timelineCurrentTime = $derived(
+    timelineRole === "mother" ? motherTime : timelineRole === "infant" ? infantTime : currentTime
+  );
+  let timelineDuration = $derived(
+    timelineRole === "mother" ? motherDuration : timelineRole === "infant" ? infantDuration : duration
+  );
+  let timelineCurrentFrame = $derived(
+    timelineRole === "mother" ? motherFrame : timelineRole === "infant" ? infantFrame : currentFrame
+  );
+  let timelineDetectedFps = $derived(
+    timelineRole === "mother" ? motherFps : timelineRole === "infant" ? infantFps : detectedFps
+  );
 
   // Tracks offsets as seen by the last offset-effect run, so dragging the
   // primary video's own offset slider still moves that video immediately.
@@ -98,6 +135,7 @@
     ceiling: 0,
     infant: 0,
   };
+  let lastPrimaryStateLogKey = "";
 
   // Helper data
   let helperData = $state<HelperData | null>(null);
@@ -227,6 +265,25 @@
     });
   });
 
+  $effect(() => {
+    const state = {
+      primaryRole,
+      loadedPrimaryRole,
+      timelineRole,
+      hasMotherSrc: videoSrcs.mother !== null,
+      hasCeilingSrc: videoSrcs.ceiling !== null,
+      hasInfantSrc: videoSrcs.infant !== null,
+      motherDuration,
+      duration,
+      infantDuration,
+      timelineDuration,
+    };
+    const key = JSON.stringify(state);
+    if (key === lastPrimaryStateLogKey) return;
+    lastPrimaryStateLogKey = key;
+    logDebugEvent("mutual-gaze", "primary-state", state);
+  });
+
   let activeFragment = $derived(
     activeFragmentId !== null
       ? fragments.find((f) => f.id === activeFragmentId) ?? null
@@ -251,12 +308,29 @@
       logDebugEvent("mutual-gaze", "load-video-cancelled-or-failed", { role });
       return;
     }
-    videoPaths[role] = result.path;
-    videoSrcs[role] = result.src;
-    logDebugEvent("mutual-gaze", "load-video-success", {
+    logDebugEvent("mutual-gaze", "load-video-selected", {
       role,
       path: result.path,
       src: result.src,
+    });
+    videoPaths = { ...videoPaths, [role]: result.path };
+    videoSrcs = { ...videoSrcs, [role]: result.src };
+    logDebugEvent("mutual-gaze", "load-video-state-assigned", {
+      role,
+      hasMotherSrc: videoSrcs.mother !== null,
+      hasCeilingSrc: videoSrcs.ceiling !== null,
+      hasInfantSrc: videoSrcs.infant !== null,
+    });
+    await tick();
+    logDebugEvent("mutual-gaze", "load-video-state-flushed", {
+      role,
+      primaryRole,
+      loadedPrimaryRole,
+      timelineRole,
+      motherDuration,
+      duration,
+      infantDuration,
+      timelineDuration,
     });
 
     // If ceiling video changed, reset everything
@@ -427,10 +501,14 @@
     return previousOffsets[role];
   }
 
-  function referenceTimeFromPrimary(time: number, usePreviousPrimaryOffset = false): number {
+  function referenceTimeFromPrimary(
+    time: number,
+    usePreviousPrimaryOffset = false,
+    role: VideoRole | null = primaryRole,
+  ): number {
     const offset = usePreviousPrimaryOffset
-      ? previousOffsetForRole(primaryRole)
-      : offsetForRole(primaryRole);
+      ? previousOffsetForRole(role)
+      : offsetForRole(role);
     return time - offset;
   }
 
@@ -534,10 +612,11 @@
   }
 
   function seekAll(time: number) {
-    const referenceTime = referenceTimeFromPrimary(time);
+    const referenceTime = referenceTimeFromPrimary(time, false, timelineRole);
     logDebugEvent("mutual-gaze", "seek-all", {
       time,
       primaryRole,
+      timelineRole,
       referenceTime,
       motherOffset,
       ceilingOffset,
@@ -552,9 +631,13 @@
     const primaryPlayer = playerForRole(primaryRole);
     logDebugEvent("mutual-gaze", "toggle-play-all", {
       primaryRole,
+      loadedPrimaryRole,
+      timelineRole,
       primaryIsPlaying,
       primaryCurrentTime,
       primaryDuration,
+      timelineCurrentTime,
+      timelineDuration,
       phase,
     });
     if (!primaryRole || !primaryPlayer) {
@@ -586,18 +669,18 @@
 
   function markStart(key: string, type: GazeEventType) {
     if (isRecording) return;
-    const wasPlaying = primaryIsPlaying;
+    const wasPlaying = timelineIsPlaying;
     activeRecording = {
       key,
       type,
-      startTime: primaryCurrentTime,
-      startFrame: primaryCurrentFrame,
+      startTime: timelineCurrentTime,
+      startFrame: timelineCurrentFrame,
       wasPlaying,
     };
     if (!wasPlaying) {
       togglePlayAll();
-      activeRecording.startTime = primaryCurrentTime;
-      activeRecording.startFrame = primaryCurrentFrame;
+      activeRecording.startTime = timelineCurrentTime;
+      activeRecording.startFrame = timelineCurrentFrame;
     }
   }
 
@@ -607,9 +690,9 @@
       id: nextEventId++,
       type: activeRecording.type,
       startTime: activeRecording.startTime,
-      endTime: primaryCurrentTime,
+      endTime: timelineCurrentTime,
       startFrame: activeRecording.startFrame,
-      endFrame: primaryCurrentFrame,
+      endFrame: timelineCurrentFrame,
     };
     const wasPlaying = activeRecording.wasPlaying;
     events = [...events, newEvent];
@@ -790,10 +873,10 @@
   </div>
 
   <GazeControls
-    isPlaying={primaryIsPlaying}
+    isPlaying={timelineIsPlaying}
     bind:playbackSpeed
-    currentTime={primaryCurrentTime}
-    duration={primaryDuration}
+    currentTime={timelineCurrentTime}
+    duration={timelineDuration}
     fragmentEndTime={activeFragment?.endTime ?? null}
     recordingLabel={activeRecording ? GAZE_EVENT_LABELS[activeRecording.type] : null}
     onTogglePlay={togglePlayAll}
@@ -803,9 +886,9 @@
     {helperData}
     {threshold}
     {events}
-    currentTime={primaryCurrentTime}
-    duration={primaryDuration}
-    detectedFps={primaryDetectedFps}
+    currentTime={timelineCurrentTime}
+    duration={timelineDuration}
+    detectedFps={timelineDetectedFps}
     fragmentStartTime={activeFragment?.startTime ?? null}
     fragmentEndTime={activeFragment?.endTime ?? null}
     recordingStartTime={activeRecording?.startTime ?? null}
