@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import type { Snippet } from "svelte";
 
   interface OverlayParams {
@@ -27,6 +28,7 @@
     onFrame?: (frame: number, mediaTime: number) => void;
     overlay?: Snippet<[OverlayParams]>;
     muted?: boolean;
+    preload?: "none" | "metadata" | "auto";
   }
 
   let {
@@ -46,6 +48,7 @@
     onFrame,
     overlay,
     muted = false,
+    preload = "auto",
   }: Props = $props();
 
   let videoEl = $state<HTMLVideoElement | null>(null);
@@ -121,9 +124,56 @@
     if (!videoEl) return;
     const err = videoEl.error;
     const msg = err
-      ? `Video error: ${err.message || "format not supported by this platform"}`
+      ? `Video error ${err.code}: ${err.message || "format not supported by this platform"}`
       : "Failed to load video — format may not be supported";
     onVideoError(msg);
+  }
+
+  function reportPlayError(e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    onVideoError(`Video play failed: ${msg}`);
+  }
+
+  function clampSeekTime(time: number, el = videoEl): number {
+    if (!Number.isFinite(time)) return 0;
+    let seekTo = Math.max(0, time);
+    if (el && Number.isFinite(el.duration) && el.duration > 0) {
+      seekTo = Math.min(seekTo, el.duration);
+    }
+    return seekTo;
+  }
+
+  function seekVideo(time: number): boolean {
+    if (!videoEl) return false;
+    const seekTo = clampSeekTime(time);
+    try {
+      videoEl.currentTime = seekTo;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      onVideoError(`Video seek failed: ${msg}`);
+      return false;
+    }
+    currentTime = seekTo;
+    currentFrame = Math.round(seekTo * detectedFps);
+    fragmentEndTriggered = false;
+    return true;
+  }
+
+  function playVideo() {
+    if (!videoEl) return;
+    const playPromise = videoEl.play();
+    playPromise?.catch(reportPlayError);
+  }
+
+  function cancelFrameCallback() {
+    if (
+      frameCallbackId !== null &&
+      videoEl &&
+      "cancelVideoFrameCallback" in videoEl
+    ) {
+      (videoEl as any).cancelVideoFrameCallback(frameCallbackId);
+    }
+    frameCallbackId = null;
   }
 
   function onPlay() {
@@ -186,49 +236,72 @@
     if (videoEl.paused) {
       if ((fragmentEndTime !== null && currentTime >= fragmentEndTime) || videoEl.ended) {
         const seekTo = fragmentStartTime ?? 0;
-        videoEl.currentTime = seekTo;
-        currentTime = seekTo;
-        currentFrame = Math.round(seekTo * detectedFps);
-        fragmentEndTriggered = false;
+        seekVideo(seekTo);
       }
-      videoEl.play();
+      playVideo();
     } else {
       videoEl.pause();
     }
   }
 
   export function seek(time: number) {
-    if (!videoEl) return;
-    videoEl.currentTime = time;
-    currentTime = time;
-    currentFrame = Math.round(time * detectedFps);
-    fragmentEndTriggered = false;
+    seekVideo(time);
   }
 
   export async function captureThumbnail(time: number): Promise<string> {
-    if (!videoEl) return "";
+    const el = videoEl;
+    if (!el) return "";
     return new Promise((resolve) => {
-      const onSeeked = () => {
-        videoEl!.removeEventListener("seeked", onSeeked);
-        const canvas = document.createElement("canvas");
-        const thumbWidth = 240;
-        const thumbHeight = Math.round(
-          thumbWidth * (videoEl!.videoHeight / videoEl!.videoWidth)
-        );
-        canvas.width = thumbWidth;
-        canvas.height = thumbHeight;
-        const ctx = canvas.getContext("2d")!;
-        ctx.drawImage(videoEl!, 0, 0, thumbWidth, thumbHeight);
-        resolve(canvas.toDataURL("image/jpeg", 0.6));
+      let settled = false;
+      let timeout: ReturnType<typeof setTimeout> | null = null;
+
+      const finish = (thumbnail: string) => {
+        if (settled) return;
+        settled = true;
+        el.removeEventListener("seeked", onSeeked);
+        el.removeEventListener("error", onThumbnailError);
+        if (timeout) clearTimeout(timeout);
+        resolve(thumbnail);
       };
-      videoEl!.addEventListener("seeked", onSeeked);
-      videoEl!.currentTime = time;
+
+      const onThumbnailError = () => finish("");
+
+      const onSeeked = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const thumbWidth = 240;
+          const thumbHeight = Math.round(
+            thumbWidth * (el.videoHeight / el.videoWidth)
+          );
+          canvas.width = thumbWidth;
+          canvas.height = thumbHeight;
+          const ctx = canvas.getContext("2d")!;
+          ctx.drawImage(el, 0, 0, thumbWidth, thumbHeight);
+          finish(canvas.toDataURL("image/jpeg", 0.6));
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          onVideoError(`Thumbnail capture failed: ${msg}`);
+          finish("");
+        }
+      };
+
+      el.addEventListener("seeked", onSeeked);
+      el.addEventListener("error", onThumbnailError);
+      timeout = setTimeout(() => finish(""), 3000);
+
+      try {
+        el.currentTime = clampSeekTime(time, el);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        onVideoError(`Thumbnail seek failed: ${msg}`);
+        finish("");
+      }
     });
   }
 
   export function togglePlayIfPaused() {
     if (!videoEl || !videoEl.paused) return;
-    videoEl.play();
+    playVideo();
   }
 
   export function pauseIfPlaying() {
@@ -239,12 +312,9 @@
   export function resetPlayback(seekTo: number) {
     if (!videoEl) return;
     videoEl.pause();
-    videoEl.currentTime = seekTo;
-    currentTime = seekTo;
-    currentFrame = Math.round(seekTo * detectedFps);
+    seekVideo(seekTo);
     isPlaying = false;
     lastMediaTime = -1;
-    fragmentEndTriggered = false;
   }
 
   let resizeObserver: ResizeObserver | null = null;
@@ -255,6 +325,14 @@
       resizeObserver.observe(containerEl);
       return () => resizeObserver?.disconnect();
     }
+  });
+
+  onDestroy(() => {
+    cancelFrameCallback();
+    if (!videoEl) return;
+    videoEl.pause();
+    videoEl.removeAttribute("src");
+    videoEl.load();
   });
 </script>
 
@@ -270,7 +348,7 @@
       onpause={onPause}
       onended={onEnded}
       onerror={onError}
-      preload="auto"
+      {preload}
       style="width: {displayWidth}px; height: {displayHeight}px; margin-left: {offsetX}px; margin-top: {offsetY}px;"
     ></video>
 

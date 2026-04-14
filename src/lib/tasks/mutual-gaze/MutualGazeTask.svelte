@@ -214,6 +214,10 @@
     toastTimeout = setTimeout(() => (toast = null), 3000);
   }
 
+  function showVideoError(role: VideoRole, msg: string) {
+    showToast(`${VIDEO_ROLE_LABELS[role]} video: ${msg}`);
+  }
+
   async function loadVideo(role: VideoRole) {
     const result = await pickAndLoadVideo(showToast, (v) => (isConverting = v));
     if (!result) return;
@@ -598,6 +602,7 @@
                   src={videoSrcs.ceiling}
                   {playbackSpeed}
                   muted={phase === "annotation"}
+                  preload="metadata"
                   bind:isPlaying
                   bind:currentTime
                   bind:duration
@@ -608,13 +613,14 @@
                   fragmentStartTime={activeFragment?.startTime ?? null}
                   fragmentEndTime={activeFragment?.endTime ?? null}
                   {onPhaseComplete}
-                  onVideoError={showToast}
+                  onVideoError={(msg) => showVideoError("ceiling", msg)}
                 />
               {:else if role === "mother"}
                 <VideoPlayer
                   bind:this={motherPlayer}
                   src={videoSrcs.mother}
                   {playbackSpeed}
+                  preload="metadata"
                   bind:isPlaying={motherPlaying}
                   bind:currentTime={motherTime}
                   bind:duration={motherDuration}
@@ -623,13 +629,14 @@
                   fragmentStartTime={activeFragment?.startTime ?? null}
                   fragmentEndTime={activeFragment?.endTime ?? null}
                   onPhaseComplete={() => {}}
-                  onVideoError={showToast}
+                  onVideoError={(msg) => showVideoError("mother", msg)}
                 />
               {:else}
                 <VideoPlayer
                   bind:this={infantPlayer}
                   src={videoSrcs.infant}
                   {playbackSpeed}
+                  preload="metadata"
                   bind:isPlaying={infantPlaying}
                   bind:currentTime={infantTime}
                   bind:duration={infantDuration}
@@ -638,7 +645,7 @@
                   fragmentStartTime={activeFragment?.startTime ?? null}
                   fragmentEndTime={activeFragment?.endTime ?? null}
                   onPhaseComplete={() => {}}
-                  onVideoError={showToast}
+                  onVideoError={(msg) => showVideoError("infant", msg)}
                 />
               {/if}
             </div>
