@@ -64,6 +64,11 @@
   let fpsProbeCount = 0;
   let lastMediaTime = -1;
   let fragmentEndTriggered = false;
+  let videoStyle = $derived(
+    displayWidth > 0 && displayHeight > 0
+      ? `width: ${displayWidth}px; height: ${displayHeight}px; margin-left: ${offsetX}px; margin-top: ${offsetY}px;`
+      : "width: 100%; height: 100%; margin-left: 0; margin-top: 0;"
+  );
 
   $effect(() => {
     if (videoEl) {
@@ -107,12 +112,48 @@
       muted,
     });
     computeDisplaySize();
+
+    requestAnimationFrame(() => computeDisplaySize());
+
+    if (videoEl.currentTime === 0 && Number.isFinite(videoEl.duration) && videoEl.duration > 0) {
+      try {
+        videoEl.currentTime = Math.min(0.001, videoEl.duration);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        logDebugEvent(debugName, "first-frame-seek-failed", { src, error: msg });
+      }
+    }
+  }
+
+  function onLoadedData() {
+    if (!videoEl) return;
+    logDebugEvent(debugName, "loaded-data", {
+      src,
+      currentTime: videoEl.currentTime,
+      networkState: videoEl.networkState,
+      readyState: videoEl.readyState,
+      displayWidth,
+      displayHeight,
+      containerWidth: containerEl?.clientWidth ?? null,
+      containerHeight: containerEl?.clientHeight ?? null,
+    });
+    computeDisplaySize();
   }
 
   function computeDisplaySize() {
     if (!containerEl || !videoWidth || !videoHeight) return;
     const cw = containerEl.clientWidth;
     const ch = containerEl.clientHeight;
+    if (cw <= 0 || ch <= 0) {
+      logDebugEvent(debugName, "display-size-unavailable", {
+        src,
+        containerWidth: cw,
+        containerHeight: ch,
+        videoWidth,
+        videoHeight,
+      });
+      return;
+    }
     const videoAspect = videoWidth / videoHeight;
     const containerAspect = cw / ch;
 
@@ -125,6 +166,15 @@
     }
     offsetX = (cw - displayWidth) / 2;
     offsetY = (ch - displayHeight) / 2;
+    logDebugEvent(debugName, "display-size-computed", {
+      src,
+      containerWidth: cw,
+      containerHeight: ch,
+      displayWidth,
+      displayHeight,
+      offsetX,
+      offsetY,
+    });
   }
 
   function onTimeUpdate() {
@@ -393,13 +443,14 @@
       src={src}
       {muted}
       onloadedmetadata={onLoadedMetadata}
+      onloadeddata={onLoadedData}
       ontimeupdate={onTimeUpdate}
       onplay={onPlay}
       onpause={onPause}
       onended={onEnded}
       onerror={onError}
       {preload}
-      style="width: {displayWidth}px; height: {displayHeight}px; margin-left: {offsetX}px; margin-top: {offsetY}px;"
+      style={videoStyle}
     ></video>
 
     {#if displayWidth > 0 && displayHeight > 0 && overlay}
