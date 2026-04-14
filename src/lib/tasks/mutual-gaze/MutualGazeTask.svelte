@@ -13,6 +13,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { getVersion } from "@tauri-apps/api/app";
   import { untrack } from "svelte";
+  import { logDebugEvent } from "../../utils/debugLog";
 
   interface Props {
     active: boolean;
@@ -219,10 +220,19 @@
   }
 
   async function loadVideo(role: VideoRole) {
+    logDebugEvent("mutual-gaze", "load-video-start", { role });
     const result = await pickAndLoadVideo(showToast, (v) => (isConverting = v));
-    if (!result) return;
+    if (!result) {
+      logDebugEvent("mutual-gaze", "load-video-cancelled-or-failed", { role });
+      return;
+    }
     videoPaths[role] = result.path;
     videoSrcs[role] = result.src;
+    logDebugEvent("mutual-gaze", "load-video-success", {
+      role,
+      path: result.path,
+      src: result.src,
+    });
 
     // If ceiling video changed, reset everything
     if (role === "ceiling") {
@@ -399,6 +409,10 @@
   async function fragmentVideo() {
     if (!videoSrcs.ceiling || duration <= 0) {
       showToast("Load the ceiling video first");
+      logDebugEvent("mutual-gaze", "fragment-video-rejected", {
+        hasCeilingVideo: videoSrcs.ceiling !== null,
+        duration,
+      });
       return;
     }
 
@@ -417,6 +431,11 @@
       });
     }
     fragments = newFragments;
+    logDebugEvent("mutual-gaze", "fragment-video-created", {
+      duration,
+      fragmentLength: len,
+      fragmentCount: fragments.length,
+    });
 
     for (const frag of fragments) {
       const thumb = await ceilingPlayer?.captureThumbnail(frag.startTime);
@@ -461,12 +480,22 @@
   }
 
   function seekAll(time: number) {
+    logDebugEvent("mutual-gaze", "seek-all", {
+      time,
+      effectiveMotherOffset,
+      effectiveInfantOffset,
+    });
     ceilingPlayer?.seek(time);
     motherPlayer?.seek(time + effectiveMotherOffset);
     infantPlayer?.seek(time + effectiveInfantOffset);
   }
 
   function togglePlayAll() {
+    logDebugEvent("mutual-gaze", "toggle-play-all", {
+      isPlaying,
+      currentTime,
+      phase,
+    });
     if (isPlaying) {
       ceilingPlayer?.togglePlay();
       pauseAll();
@@ -478,6 +507,10 @@
   }
 
   function changePhase(p: GazePhase) {
+    logDebugEvent("mutual-gaze", "phase-changed", {
+      from: phase,
+      to: p,
+    });
     phase = p;
   }
 
@@ -603,6 +636,7 @@
                   {playbackSpeed}
                   muted={phase === "annotation"}
                   preload="metadata"
+                  debugName="mutual-gaze:ceiling"
                   bind:isPlaying
                   bind:currentTime
                   bind:duration
@@ -621,6 +655,7 @@
                   src={videoSrcs.mother}
                   {playbackSpeed}
                   preload="metadata"
+                  debugName="mutual-gaze:mother"
                   bind:isPlaying={motherPlaying}
                   bind:currentTime={motherTime}
                   bind:duration={motherDuration}
@@ -637,6 +672,7 @@
                   src={videoSrcs.infant}
                   {playbackSpeed}
                   preload="metadata"
+                  debugName="mutual-gaze:infant"
                   bind:isPlaying={infantPlaying}
                   bind:currentTime={infantTime}
                   bind:duration={infantDuration}

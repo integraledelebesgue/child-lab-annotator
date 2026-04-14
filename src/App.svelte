@@ -1,9 +1,11 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import "./app.css";
   import TabBar from "./lib/components/TabBar.svelte";
   import HeadTrackingTask from "./lib/tasks/head-tracking/HeadTrackingTask.svelte";
   import SmileTask from "./lib/tasks/smile/SmileTask.svelte";
   import MutualGazeTask from "./lib/tasks/mutual-gaze/MutualGazeTask.svelte";
+  import { getDebugLogStatus, logDebugEvent } from "./lib/utils/debugLog";
 
   const tabs = [
     { id: "head-tracking", label: "Head Tracking" },
@@ -12,6 +14,14 @@
   ];
 
   let activeTab = $state("head-tracking");
+
+  onMount(async () => {
+    const status = await getDebugLogStatus();
+    logDebugEvent("frontend", "app-mounted", {
+      debugLogEnabled: status.enabled,
+      debugLogPath: status.path,
+    });
+  });
 </script>
 
 <div class="app">

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import type { Snippet } from "svelte";
+  import { logDebugEvent } from "../utils/debugLog";
 
   interface OverlayParams {
     displayWidth: number;
@@ -29,6 +30,7 @@
     overlay?: Snippet<[OverlayParams]>;
     muted?: boolean;
     preload?: "none" | "metadata" | "auto";
+    debugName?: string;
   }
 
   let {
@@ -49,6 +51,7 @@
     overlay,
     muted = false,
     preload = "auto",
+    debugName = "video",
   }: Props = $props();
 
   let videoEl = $state<HTMLVideoElement | null>(null);
@@ -75,6 +78,14 @@
     fragmentEndTriggered = false;
   });
 
+  $effect(() => {
+    logDebugEvent(debugName, "src-updated", {
+      hasSrc: src !== null,
+      src,
+      preload,
+    });
+  });
+
   function onLoadedMetadata() {
     if (!videoEl) return;
     currentTime = 0;
@@ -87,6 +98,14 @@
     duration = videoEl.duration;
     videoWidth = videoEl.videoWidth;
     videoHeight = videoEl.videoHeight;
+    logDebugEvent(debugName, "loaded-metadata", {
+      src,
+      duration,
+      videoWidth,
+      videoHeight,
+      preload,
+      muted,
+    });
     computeDisplaySize();
   }
 
@@ -126,11 +145,19 @@
     const msg = err
       ? `Video error ${err.code}: ${err.message || "format not supported by this platform"}`
       : "Failed to load video — format may not be supported";
+    logDebugEvent(debugName, "video-error", {
+      src,
+      code: err?.code ?? null,
+      message: err?.message ?? null,
+      networkState: videoEl.networkState,
+      readyState: videoEl.readyState,
+    });
     onVideoError(msg);
   }
 
   function reportPlayError(e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
+    logDebugEvent(debugName, "play-failed", { src, error: msg });
     onVideoError(`Video play failed: ${msg}`);
   }
 
@@ -150,6 +177,12 @@
       videoEl.currentTime = seekTo;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      logDebugEvent(debugName, "seek-failed", {
+        src,
+        requestedTime: time,
+        seekTo,
+        error: msg,
+      });
       onVideoError(`Video seek failed: ${msg}`);
       return false;
     }
@@ -264,7 +297,10 @@
         resolve(thumbnail);
       };
 
-      const onThumbnailError = () => finish("");
+      const onThumbnailError = () => {
+        logDebugEvent(debugName, "thumbnail-error", { src, time });
+        finish("");
+      };
 
       const onSeeked = () => {
         try {
@@ -280,6 +316,11 @@
           finish(canvas.toDataURL("image/jpeg", 0.6));
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
+          logDebugEvent(debugName, "thumbnail-capture-failed", {
+            src,
+            time,
+            error: msg,
+          });
           onVideoError(`Thumbnail capture failed: ${msg}`);
           finish("");
         }
@@ -287,12 +328,20 @@
 
       el.addEventListener("seeked", onSeeked);
       el.addEventListener("error", onThumbnailError);
-      timeout = setTimeout(() => finish(""), 3000);
+      timeout = setTimeout(() => {
+        logDebugEvent(debugName, "thumbnail-timeout", { src, time });
+        finish("");
+      }, 3000);
 
       try {
         el.currentTime = clampSeekTime(time, el);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        logDebugEvent(debugName, "thumbnail-seek-failed", {
+          src,
+          time,
+          error: msg,
+        });
         onVideoError(`Thumbnail seek failed: ${msg}`);
         finish("");
       }
@@ -328,6 +377,7 @@
   });
 
   onDestroy(() => {
+    logDebugEvent(debugName, "destroyed", { src });
     cancelFrameCallback();
     if (!videoEl) return;
     videoEl.pause();
