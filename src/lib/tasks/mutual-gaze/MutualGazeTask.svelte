@@ -45,7 +45,7 @@
     infant: null,
   });
 
-  // VideoPlayer refs — ceiling is the primary (controls playback)
+  // VideoPlayer refs — ceiling is preferred, but controls fall back to the first loaded video.
   let ceilingPlayer = $state<ReturnType<typeof VideoPlayer> | null>(null);
   let motherPlayer = $state<ReturnType<typeof VideoPlayer> | null>(null);
   let infantPlayer = $state<ReturnType<typeof VideoPlayer> | null>(null);
@@ -71,10 +71,33 @@
   let effectiveMotherOffset = $derived(motherOffset - ceilingOffset);
   let effectiveInfantOffset = $derived(infantOffset - ceilingOffset);
 
-  // Tracks the ceiling offset as seen by the last offset-effect run,
-  // so the reference point can be derived from currentTime correctly
-  // even after playback has advanced the position.
-  let prevCeilingOffset = 0;
+  let primaryRole: VideoRole | null = $derived(
+    videoSrcs.ceiling ? "ceiling" : videoSrcs.mother ? "mother" : videoSrcs.infant ? "infant" : null
+  );
+  let primaryIsPlaying = $derived(
+    primaryRole === "mother" ? motherPlaying : primaryRole === "infant" ? infantPlaying : isPlaying
+  );
+  let primaryCurrentTime = $derived(
+    primaryRole === "mother" ? motherTime : primaryRole === "infant" ? infantTime : currentTime
+  );
+  let primaryDuration = $derived(
+    primaryRole === "mother" ? motherDuration : primaryRole === "infant" ? infantDuration : duration
+  );
+  let primaryCurrentFrame = $derived(
+    primaryRole === "mother" ? motherFrame : primaryRole === "infant" ? infantFrame : currentFrame
+  );
+  let primaryDetectedFps = $derived(
+    primaryRole === "mother" ? motherFps : primaryRole === "infant" ? infantFps : detectedFps
+  );
+  let offsetStep = $derived(1 / Math.max(primaryDetectedFps, 1));
+
+  // Tracks offsets as seen by the last offset-effect run, so dragging the
+  // primary video's own offset slider still moves that video immediately.
+  let previousOffsets: Record<VideoRole, number> = {
+    mother: 0,
+    ceiling: 0,
+    infant: 0,
+  };
 
   // Helper data
   let helperData = $state<HelperData | null>(null);
@@ -180,13 +203,13 @@
     untrack(() => {
       const seekTo = activeFragment?.startTime ?? 0;
       seekAll(seekTo);
-      isPlaying = false;
+      pauseAll();
     });
   });
 
   // Seek videos in real-time when offsets change during sync phase.
-  // Derives the reference point from currentTime (ceiling's actual position)
-  // using prevCeilingOffset, so it works correctly even after playback.
+  // Derives the reference point from the active primary video's actual
+  // position, then applies each video's individual offset.
   // Only the video whose slider changed actually moves.
   $effect(() => {
     motherOffset;
@@ -194,11 +217,13 @@
     infantOffset;
     untrack(() => {
       if (phase !== "synchronization") return;
-      const ref = currentTime - prevCeilingOffset;
-      ceilingPlayer?.seek(ref + ceilingOffset);
-      motherPlayer?.seek(ref + motherOffset);
-      infantPlayer?.seek(ref + infantOffset);
-      prevCeilingOffset = ceilingOffset;
+      const ref = referenceTimeFromPrimary(primaryCurrentTime, true);
+      seekToReferenceTime(ref);
+      previousOffsets = {
+        mother: motherOffset,
+        ceiling: ceilingOffset,
+        infant: infantOffset,
+      };
     });
   });
 
@@ -390,17 +415,46 @@
     }
   }
 
-  function syncSecondaryPlayers() {
-    motherPlayer?.seek(currentTime + effectiveMotherOffset);
-    infantPlayer?.seek(currentTime + effectiveInfantOffset);
+  function offsetForRole(role: VideoRole | null): number {
+    if (role === "mother") return motherOffset;
+    if (role === "ceiling") return ceilingOffset;
+    if (role === "infant") return infantOffset;
+    return 0;
   }
 
-  function playAll() {
-    motherPlayer?.togglePlayIfPaused();
-    infantPlayer?.togglePlayIfPaused();
+  function previousOffsetForRole(role: VideoRole | null): number {
+    if (!role) return 0;
+    return previousOffsets[role];
+  }
+
+  function referenceTimeFromPrimary(time: number, usePreviousPrimaryOffset = false): number {
+    const offset = usePreviousPrimaryOffset
+      ? previousOffsetForRole(primaryRole)
+      : offsetForRole(primaryRole);
+    return time - offset;
+  }
+
+  function playerForRole(role: VideoRole | null): ReturnType<typeof VideoPlayer> | null {
+    if (role === "ceiling") return ceilingPlayer;
+    if (role === "mother") return motherPlayer;
+    if (role === "infant") return infantPlayer;
+    return null;
+  }
+
+  function seekToReferenceTime(referenceTime: number) {
+    ceilingPlayer?.seek(referenceTime + ceilingOffset);
+    motherPlayer?.seek(referenceTime + motherOffset);
+    infantPlayer?.seek(referenceTime + infantOffset);
+  }
+
+  function playLoadedPlayersExcept(role: VideoRole | null) {
+    if (role !== "ceiling" && videoSrcs.ceiling) ceilingPlayer?.togglePlayIfPaused();
+    if (role !== "mother" && videoSrcs.mother) motherPlayer?.togglePlayIfPaused();
+    if (role !== "infant" && videoSrcs.infant) infantPlayer?.togglePlayIfPaused();
   }
 
   function pauseAll() {
+    ceilingPlayer?.pauseIfPlaying();
     motherPlayer?.pauseIfPlaying();
     infantPlayer?.pauseIfPlaying();
   }
@@ -462,7 +516,7 @@
       events = [...frag.events];
       nextEventId = events.length > 0 ? Math.max(...events.map((e) => e.id)) + 1 : 0;
       seekAll(frag.startTime);
-      isPlaying = false;
+      pauseAll();
     }
   }
 
@@ -480,29 +534,45 @@
   }
 
   function seekAll(time: number) {
+    const referenceTime = referenceTimeFromPrimary(time);
     logDebugEvent("mutual-gaze", "seek-all", {
       time,
+      primaryRole,
+      referenceTime,
+      motherOffset,
+      ceilingOffset,
+      infantOffset,
       effectiveMotherOffset,
       effectiveInfantOffset,
     });
-    ceilingPlayer?.seek(time);
-    motherPlayer?.seek(time + effectiveMotherOffset);
-    infantPlayer?.seek(time + effectiveInfantOffset);
+    seekToReferenceTime(referenceTime);
   }
 
   function togglePlayAll() {
+    const primaryPlayer = playerForRole(primaryRole);
     logDebugEvent("mutual-gaze", "toggle-play-all", {
-      isPlaying,
-      currentTime,
+      primaryRole,
+      primaryIsPlaying,
+      primaryCurrentTime,
+      primaryDuration,
       phase,
     });
-    if (isPlaying) {
-      ceilingPlayer?.togglePlay();
+    if (!primaryRole || !primaryPlayer) {
+      showToast("Load a video first");
+      return;
+    }
+
+    if (primaryIsPlaying) {
       pauseAll();
     } else {
-      syncSecondaryPlayers();
-      ceilingPlayer?.togglePlay();
-      playAll();
+      const shouldRestart =
+        (activeFragment?.endTime !== undefined && primaryCurrentTime >= activeFragment.endTime) ||
+        (primaryDuration > 0 && primaryCurrentTime >= primaryDuration);
+      const startTime = shouldRestart ? activeFragment?.startTime ?? 0 : primaryCurrentTime;
+      const referenceTime = referenceTimeFromPrimary(startTime);
+      seekToReferenceTime(referenceTime);
+      primaryPlayer.togglePlay();
+      playLoadedPlayersExcept(primaryRole);
     }
   }
 
@@ -516,18 +586,18 @@
 
   function markStart(key: string, type: GazeEventType) {
     if (isRecording) return;
-    const wasPlaying = isPlaying;
+    const wasPlaying = primaryIsPlaying;
     activeRecording = {
       key,
       type,
-      startTime: currentTime,
-      startFrame: currentFrame,
+      startTime: primaryCurrentTime,
+      startFrame: primaryCurrentFrame,
       wasPlaying,
     };
     if (!wasPlaying) {
       togglePlayAll();
-      activeRecording.startTime = currentTime;
-      activeRecording.startFrame = currentFrame;
+      activeRecording.startTime = primaryCurrentTime;
+      activeRecording.startFrame = primaryCurrentFrame;
     }
   }
 
@@ -537,9 +607,9 @@
       id: nextEventId++,
       type: activeRecording.type,
       startTime: activeRecording.startTime,
-      endTime: currentTime,
+      endTime: primaryCurrentTime,
       startFrame: activeRecording.startFrame,
-      endFrame: currentFrame,
+      endFrame: primaryCurrentFrame,
     };
     const wasPlaying = activeRecording.wasPlaying;
     events = [...events, newEvent];
@@ -688,21 +758,21 @@
             {#if phase === "synchronization" && role === "mother"}
               <div class="offset-bar">
                 <span class="offset-label">Offset:</span>
-                <input type="range" class="offset-slider" min="0" max="2" step={1 / detectedFps} bind:value={motherOffset} />
+                <input type="range" class="offset-slider" min="0" max="2" step={offsetStep} bind:value={motherOffset} />
                 <span class="offset-value">{motherOffset.toFixed(3)}s</span>
               </div>
             {/if}
             {#if phase === "synchronization" && role === "ceiling"}
               <div class="offset-bar">
                 <span class="offset-label">Offset:</span>
-                <input type="range" class="offset-slider" min="0" max="2" step={1 / detectedFps} bind:value={ceilingOffset} />
+                <input type="range" class="offset-slider" min="0" max="2" step={offsetStep} bind:value={ceilingOffset} />
                 <span class="offset-value">{ceilingOffset.toFixed(3)}s</span>
               </div>
             {/if}
             {#if phase === "synchronization" && role === "infant"}
               <div class="offset-bar">
                 <span class="offset-label">Offset:</span>
-                <input type="range" class="offset-slider" min="0" max="2" step={1 / detectedFps} bind:value={infantOffset} />
+                <input type="range" class="offset-slider" min="0" max="2" step={offsetStep} bind:value={infantOffset} />
                 <span class="offset-value">{infantOffset.toFixed(3)}s</span>
               </div>
             {/if}
@@ -720,10 +790,10 @@
   </div>
 
   <GazeControls
-    {isPlaying}
+    isPlaying={primaryIsPlaying}
     bind:playbackSpeed
-    {currentTime}
-    {duration}
+    currentTime={primaryCurrentTime}
+    duration={primaryDuration}
     fragmentEndTime={activeFragment?.endTime ?? null}
     recordingLabel={activeRecording ? GAZE_EVENT_LABELS[activeRecording.type] : null}
     onTogglePlay={togglePlayAll}
@@ -733,9 +803,9 @@
     {helperData}
     {threshold}
     {events}
-    {currentTime}
-    {duration}
-    {detectedFps}
+    currentTime={primaryCurrentTime}
+    duration={primaryDuration}
+    detectedFps={primaryDetectedFps}
     fragmentStartTime={activeFragment?.startTime ?? null}
     fragmentEndTime={activeFragment?.endTime ?? null}
     recordingStartTime={activeRecording?.startTime ?? null}
